@@ -54,3 +54,16 @@ class SubjectDAO:
 			rets.append(r[0])
 		cursor.close()
 		return rets
+
+	@staticmethod
+	def fetchMulti(triggers):
+		fm = ",".join(list(map(lambda x: "'{0}'".format(x), triggers)))
+		sql = "SELECT response FROM tb_subject WHERE trigger IN ({0})".format(fm)
+		cursor = DB.conn.cursor()
+		cursor.execute(sql)
+		recs = cursor.fetchall()
+		rets = []
+		for r in recs:
+			rets.append(r[0])
+		cursor.close()
+		return rets

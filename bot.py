@@ -12,9 +12,9 @@ class TwistBot(discord.Client):
 
 		self.words = {}
 		self.exclude = DB.getExcludes()
-		self.maxMessageBeforeMine = 10
+		self.maxMessageBeforeMine = 15
 		self.messageCount = 0
-		self.learn = True
+		self.learn = False
 		self.subject = []
 		self.firstTime = True
 
@@ -27,7 +27,9 @@ class TwistBot(discord.Client):
 		def _cleanup(x):
 			return re.sub(r'[^0-9a-zA-Z_\-]+', '', x)
 
-		words = message.content.lower().split()
+		msg = discord.utils.escape_mentions(message.content)
+		msg = re.sub(r'<@.*>', '', msg).strip(' ')
+		words = msg.lower().split()
 		words = list(map(_cleanup, words))
 
 		for w in words:
@@ -39,27 +41,25 @@ class TwistBot(discord.Client):
 
 			SubjectDAO.put(w, message.content)
 
-		shouldChangeSubject = random.randint(0, 100) >= 60 # 60% of chance to change the subject
+		shouldSendMessage = random.randint(0, 100) <= 50 # 50% of chance to send a message
 
 		self.messageCount += 1
 		if self.messageCount >= self.maxMessageBeforeMine:
 			self.messageCount = 0
 
 			sortedWords = collections.OrderedDict(sorted(self.words.items(), key=lambda kv: kv[1], reverse=True))
-			top2 = list(sortedWords.keys())[:2]
-			print(top2)
+			if len(sortedWords.keys()) >= 4:
+				top4 = list(sortedWords.keys())[:4]
+				print(top4)
 
-			if shouldChangeSubject or self.firstTime:
-				await self.changeStatus('{0} and {1}'.format(top2[0], top2[1]))
-				self.subject = top2
-				self.firstTime = False
+				self.words = {}
+				await self.changeStatus('{0}'.format(top4[0]))
+				self.subject = top4
 
-#https://discordapp.com/api/oauth2/authorize?client_id=626879584666779648&permissions=117760&scope=bot
-			if not self.learn:
-				l0 = SubjectDAO.fetch(self.subject[0])
-				l1 = SubjectDAO.fetch(self.subject[1])
-				lst = l0 + l1
-
+		elif self.messageCount == 3:
+			if not self.learn and shouldSendMessage and len(self.subject) >= 4:
+				subs = list(map(_cleanup, self.subject))
+				lst = SubjectDAO.fetchMulti(subs)
 				if len(lst) > 0:
 					msg = random.choice(lst)
 					await message.channel.send(msg.replace("`", "'"))

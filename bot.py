@@ -11,7 +11,7 @@ class TwistBot(discord.Client):
 		print('Logged in as {0}.'.format(self.user))
 
 		self.words = {}
-		self.maxMessageBeforeMine = 15
+		self.maxMessageBeforeMine = 20
 		self.messageCount = 0
 		self.learn = False
 		self.subject = SubjectDAO.randomSubject()

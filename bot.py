@@ -39,7 +39,7 @@ class TwistBot(discord.Client):
 				self.words[w] = 0
 			self.words[w] += 1
 
-			SubjectDAO.put(w, message.content)
+			SubjectDAO.put(w, msg)
 
 		shouldSendMessage = random.randint(0, 100) <= 50 # 50% of chance to send a message
 

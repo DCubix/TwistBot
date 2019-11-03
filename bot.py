@@ -56,13 +56,12 @@ class TwistBot(discord.Client):
 				await self.changeStatus('{0}'.format(top4[0]))
 				self.subject = top4
 
-		elif self.messageCount == 3:
-			if not self.learn and shouldSendMessage and len(self.subject) >= 4:
-				subs = list(map(_cleanup, self.subject))
-				lst = SubjectDAO.fetchMulti(subs)
-				if len(lst) > 0:
-					msg = random.choice(lst)
-					await message.channel.send(msg.replace("`", "'"))
+		if not self.learn and shouldSendMessage and len(self.subject) >= 4:
+			subs = list(map(_cleanup, self.subject))
+			lst = SubjectDAO.fetchMulti(subs)
+			if len(lst) > 0:
+				msg = random.choice(lst)
+				await message.channel.send(msg.replace("`", "'"))
 
 client = TwistBot()
 tok = ''

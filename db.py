@@ -24,7 +24,7 @@ class DB:
 
 	def getExcludes():
 		sql = "SELECT word FROM tb_exclude"
-		cursor = DB.conn.cursor()
+		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		recs = cursor.fetchall()
 		rets = []
@@ -38,7 +38,7 @@ class SubjectDAO:
 	def put(trigger, response):
 		response = response.replace("'", "`")
 		sql = "INSERT INTO tb_subject('trigger', 'response') VALUES('{0}', '{1}')".format(trigger, response)
-		cursor = DB.conn.cursor()
+		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		DB.conn.commit()
 		cursor.close()
@@ -46,7 +46,19 @@ class SubjectDAO:
 	@staticmethod
 	def fetch(trigger):
 		sql = "SELECT response FROM tb_subject WHERE trigger LIKE '{0}'".format('%'+trigger+'%')
-		cursor = DB.conn.cursor()
+		cursor = DB.connection().cursor()
+		cursor.execute(sql)
+		recs = cursor.fetchall()
+		rets = []
+		for r in recs:
+			rets.append(r[0])
+		cursor.close()
+		return rets
+
+	@staticmethod
+	def randomSubject():
+		sql = "SELECT trigger FROM tb_subject ORDER BY RANDOM() LIMIT 4"
+		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		recs = cursor.fetchall()
 		rets = []
@@ -59,7 +71,7 @@ class SubjectDAO:
 	def fetchMulti(triggers):
 		fm = ",".join(list(map(lambda x: "'{0}'".format(x), triggers)))
 		sql = "SELECT response FROM tb_subject WHERE trigger IN ({0})".format(fm)
-		cursor = DB.conn.cursor()
+		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		recs = cursor.fetchall()
 		rets = []

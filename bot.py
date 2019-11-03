@@ -11,14 +11,12 @@ class TwistBot(discord.Client):
 		print('Logged in as {0}.'.format(self.user))
 
 		self.words = {}
-		self.exclude = DB.getExcludes()
 		self.maxMessageBeforeMine = 15
 		self.messageCount = 0
 		self.learn = False
-		self.subject = []
-		self.firstTime = True
+		self.subject = SubjectDAO.randomSubject()
 
-		await self.changeStatus('nothing')
+		await self.changeStatus('{0}'.format(self.subject[0].upper()))
 
 	async def on_message(self, message):
 		if message.author == self.user:
@@ -33,8 +31,9 @@ class TwistBot(discord.Client):
 		words = msg.lower().split()
 		words = list(map(_cleanup, words))
 
+		excludes = DB.getExcludes()
 		for w in words:
-			if len(w) < 2 or w in self.exclude:
+			if len(w) < 2 or w in excludes:
 				continue
 			if w not in self.words.keys():
 				self.words[w] = 0
@@ -54,12 +53,13 @@ class TwistBot(discord.Client):
 				print(top4)
 
 				self.words = {}
-				await self.changeStatus('{0}'.format(top4[0]))
+				await self.changeStatus('{0}'.format(top4[0].upper()))
 				self.subject = top4
 
 		if not self.learn and shouldSendMessage and len(self.subject) >= 4:
 			subs = list(map(_cleanup, self.subject))
-			lst = SubjectDAO.fetchMulti(subs)
+
+			lst = SubjectDAO.fetchMulti(subs + words)
 			if len(lst) > 0:
 				msg = random.choice(lst)
 				await message.channel.send(msg.replace("`", "'"))

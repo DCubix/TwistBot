@@ -29,6 +29,7 @@ class TwistBot(discord.Client):
 
 		msg = discord.utils.escape_mentions(message.content)
 		msg = re.sub(r'<@.*>', '', msg).strip(' ')
+		msg = re.sub(r'<:.*>', '', msg).strip(' ')
 		words = msg.lower().split()
 		words = list(map(_cleanup, words))
 

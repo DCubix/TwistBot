@@ -1,4 +1,4 @@
-import discord, collections, random, re
+import discord, collections, random, re, asyncio
 from db import DB, SubjectDAO
 
 class TwistBot(discord.Client):
@@ -41,11 +41,13 @@ class TwistBot(discord.Client):
 
 			SubjectDAO.put(w, msg)
 
-		shouldSendMessage = random.randint(0, 100) <= 50 # 50% of chance to send a message
+		shouldSendMessage = random.randint(0, 100) <= 40 # 40% of chance to send a message
 
 		self.messageCount += 1
 		if self.messageCount >= self.maxMessageBeforeMine:
 			self.messageCount = 0
+
+			await asyncio.sleep(5)
 
 			sortedWords = collections.OrderedDict(sorted(self.words.items(), key=lambda kv: kv[1], reverse=True))
 			if len(sortedWords.keys()) >= 4:
@@ -62,6 +64,7 @@ class TwistBot(discord.Client):
 			lst = SubjectDAO.fetchMulti(subs + words)
 			if len(lst) > 0:
 				msg = random.choice(lst)
+				await asyncio.sleep(2)
 				await message.channel.send(msg.replace("`", "'"))
 
 client = TwistBot()

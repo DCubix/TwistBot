@@ -22,6 +22,12 @@ class TwistBot(discord.Client):
 		if message.author == self.user:
 			return
 
+		cmdmsg = message.content.lower()
+		if 'thinking' in cmdmsg and 'twist' in cmdmsg and 'what' in cmdmsg:
+			subs = 'nothing' if len(self.subject) == 0 else ', '.join(self.subject)
+			await message.channel.send("I'm thinking about `{0}` right now.".format(subs))
+			return
+
 		def _cleanup(x):
 			return re.sub(r'[^0-9a-zA-Z_\-]+', '', x)
 

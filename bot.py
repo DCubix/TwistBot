@@ -32,8 +32,9 @@ class TwistBot(discord.Client):
 			return re.sub(r'[^0-9a-zA-Z_\-]+', '', x)
 
 		msg = discord.utils.escape_mentions(message.content)
-		msg = re.sub(r'<@.*>', '', msg).strip(' ')
-		msg = re.sub(r'<:.*>', '', msg).strip(' ')
+		msg = re.sub(r'<@.*>', '', msg).strip()
+		msg = re.sub(r'<:.*>', '', msg).strip()
+		msg = re.sub(re.compile(r'```.*```', re.DOTALL), '', msg).strip()
 		words = msg.lower().split()
 		words = list(map(_cleanup, words))
 
@@ -85,6 +86,6 @@ class TwistBot(discord.Client):
 client = TwistBot()
 tok = ''
 with open('__tok.dat', 'r') as f:
-	tok = f.read()
+	tok = f.read().strip(' \n\r')
 client.run(tok)
 DB.close()

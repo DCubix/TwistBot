@@ -10,10 +10,10 @@ class TwistBot(discord.Client):
 		DB.connection()
 		print('Logged in as {0}.'.format(self.user))
 
-		self.words = {}
+		self.words = {} # channelID: { words.... }
 		self.maxMessageBeforeMine = 30
 		self.messageCount = 0
-		self.maxWords = 4
+		self.maxWords = 8
 		self.learn = False
 
 		self.subject = DB.randomWords(self.maxWords)
@@ -26,7 +26,10 @@ class TwistBot(discord.Client):
 			return
 
 		is_dm = message.channel.type == 'private'
-		print(message.content)
+
+		mid = message.channel.id if not is_dm else message.author.id
+		if not mid in self.words.keys():
+			self.words[mid] = {}
 
 		cmdmsg = message.content.lower()
 		if 'thinking' in cmdmsg and 'twist' in cmdmsg and 'what' in cmdmsg:
@@ -56,19 +59,18 @@ class TwistBot(discord.Client):
 				w += " " + words.pop(0).strip()
 			groupedWords.append(w.strip())
 
-		if len(self.words.keys()) >= 100:
+		if len(self.words[mid].keys()) >= 100:
 			self.subject = DB.randomWords(self.maxWords)
 			await self.changeStatus('"{0}"'.format(self.subject[0]))
-			self.words = {}
+			self.words[mid] = {}
 
 		for w in groupedWords:
 			DB.saveTrigger(w, msg)
-			if w not in self.words.keys(): self.words[w] = 0
-			self.words[w] += 1
+			if w not in self.words[mid].keys(): self.words[mid][w] = 0
+			self.words[mid][w] += 1
 
-		sortedWords = collections.OrderedDict(sorted(self.words.items(), key=lambda kv: kv[1], reverse=True))
+		sortedWords = collections.OrderedDict(sorted(self.words[mid].items(), key=lambda kv: kv[1], reverse=True))
 		if len(sortedWords.items()) >= self.maxWords:
-			await asyncio.sleep(5)
 			self.subject = list(sortedWords.keys())[:self.maxWords]
 			await self.changeStatus('"{0}"'.format(self.subject[0]))
 			print(self.subject)
@@ -80,7 +82,7 @@ class TwistBot(discord.Client):
 			lst = DB.getResponse(subs)
 			if len(lst) > 0:
 				msg = random.choice(lst)
-				typingTimeSecs = len(msg) * 0.1
+				typingTimeSecs = len(msg) * 0.08
 				async with message.channel.typing():
 					await asyncio.sleep(1 + typingTimeSecs)
 				if not is_dm:

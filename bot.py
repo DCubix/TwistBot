@@ -22,8 +22,8 @@ class TwistBot(discord.Client):
 	async def on_message(self, message):
 		if message.author == self.user:
 			return
-		if message.author.bot:
-			return
+		#if message.author.bot:
+		#	return
 
 		is_dm = message.channel.type == 'private'
 

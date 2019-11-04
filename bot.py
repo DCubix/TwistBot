@@ -10,7 +10,7 @@ class TwistBot(discord.Client):
 		DB.connection()
 		print('Logged in as {0}.'.format(self.user))
 
-		self.words = {} # channelID: { words.... }
+		self.words = {}
 		self.maxMessageBeforeMine = 30
 		self.messageCount = 0
 		self.maxWords = 8
@@ -30,6 +30,7 @@ class TwistBot(discord.Client):
 		mid = message.channel.id if not is_dm else message.author.id
 		if not mid in self.words.keys():
 			self.words[mid] = {}
+			for w in self.subject: self.words[mid][w] = 1
 
 		cmdmsg = message.content.lower()
 		if 'thinking' in cmdmsg and 'twist' in cmdmsg and 'what' in cmdmsg:

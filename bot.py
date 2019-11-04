@@ -1,5 +1,5 @@
 import discord, collections, random, re, asyncio, time
-from db import DB, SubjectDAO
+from db import DB
 
 class TwistBot(discord.Client):
 	async def changeStatus(self, status):
@@ -16,8 +16,8 @@ class TwistBot(discord.Client):
 		self.maxWords = 6
 		self.learn = False
 
-		self.subject = SubjectDAO.randomSubject(self.maxWords)
-		await self.changeStatus('{0}'.format(self.subject[0].upper()))
+		self.subject = []#SubjectDAO.randomSubject(self.maxWords)
+		#await self.changeStatus('{0}'.format(self.subject[0].upper()))
 
 	async def on_message(self, message):
 		if message.author == self.user:
@@ -47,7 +47,7 @@ class TwistBot(discord.Client):
 				self.words[w] = 0
 			self.words[w] += 1
 
-			SubjectDAO.put(w, msg)
+			#SubjectDAO.put(w, msg)
 
 		shouldSendMessage = random.randint(0, 100) <= 30
 
@@ -78,15 +78,16 @@ class TwistBot(discord.Client):
 			if not self.learn and shouldSendMessage and len(self.subject) >= self.maxWords:
 				subs = list(map(_cleanup, self.subject))
 
-				lst = SubjectDAO.fetchMulti(subs + words)
+				lst = []#SubjectDAO.fetchMulti(subs + words)
 				if len(lst) > 0:
 					msg = random.choice(lst)
 					await asyncio.sleep(5)
 					await message.channel.send(msg.replace("`", "'"))
 
-client = TwistBot()
-tok = ''
-with open('__tok.dat', 'r') as f:
-	tok = f.read().strip(' \n\r')
-client.run(tok)
+# client = TwistBot()
+# tok = ''
+# with open('__tok.dat', 'r') as f:
+# 	tok = f.read().strip(' \n\r')
+# client.run(tok)
+DB.connection()
 DB.close()

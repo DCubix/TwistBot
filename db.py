@@ -1,27 +1,67 @@
 import sqlite3
 
+dbsql = """
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS tb_word(
+	id integer primary key,
+	data text
+);
+
+CREATE TABLE IF NOT EXISTS tb_sentence(
+	id integer primary key,
+	data text
+);
+
+CREATE TABLE IF NOT EXISTS tb_trigger(
+	trigger integer,
+	response integer,
+	FOREIGN KEY(trigger) REFERENCES tb_word(id),
+	FOREIGN KEY(response) REFERENCES tb_sentence(id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_exclude(
+	id integer primary key,
+	word text
+);
+"""
+
 class DB:
 	conn = None
 
 	@staticmethod
+	def migrateData(db):
+		print("Migrating Data...")
+		oldcon = sqlite3.connect(db)
+		cur = oldcon.cursor()
+		cur.execute("SELECT trigger, response FROM tb_subject")
+		# [(id, trigger, response), ...]
+		recs = cur.fetchall()
+		DB.saveTriggers(recs)
+		cur.close()
+		oldcon.close()
+		print("Done!")
+
+	@staticmethod
 	def connection():
 		if DB.conn is None:
-			DB.conn = sqlite3.connect('data.db')
+			DB.conn = sqlite3.connect('tb_data.db')
 			cursor = DB.conn.cursor()
-
-			sql = 'CREATE TABLE IF NOT EXISTS tb_subject(id integer primary key, trigger text, response text)'
-			cursor.execute(sql)
-			sql = 'CREATE TABLE IF NOT EXISTS tb_exclude(id integer primary key, word text)'
-			cursor.execute(sql)
-
+			for sql in dbsql.split(';'):
+				print(sql)
+				cursor.execute(sql)
 			DB.conn.commit()
 			cursor.close()
+
+			#DB.migrateData('data.db')
+
 		return DB.conn
 
 	@staticmethod
 	def close():
 		DB.conn.close()
 
+	@staticmethod
 	def getExcludes():
 		sql = "SELECT word FROM tb_exclude"
 		cursor = DB.connection().cursor()
@@ -33,48 +73,89 @@ class DB:
 		cursor.close()
 		return rets
 
-class SubjectDAO:
 	@staticmethod
-	def put(trigger, response):
-		response = response.replace("'", "`")
+	def wordID(w):
+		sql = "SELECT id FROM tb_word WHERE data = '{0}'".format(w)
+		cursor = DB.connection().cursor()
+		cursor.execute(sql)
+		recs = cursor.fetchall()
+		rets = []
+		for r in recs:
+			rets.append(r[0])
+		cursor.close()
+		return rets[0] if len(rets) > 0 else None
+
+	@staticmethod
+	def sentenceID(s):
+		sql = "SELECT id FROM tb_sentence WHERE data = '{0}'".format(s)
+		cursor = DB.connection().cursor()
+		cursor.execute(sql)
+		recs = cursor.fetchall()
+		rets = []
+		for r in recs:
+			rets.append(r[0])
+		cursor.close()
+		return rets[0] if len(rets) > 0 else None
+
+	@staticmethod
+	def saveWord(w):
+		cursor = DB.connection().cursor()
+		w = w.replace("'", "`")
 		sql = """
-INSERT INTO tb_subject('trigger', 'response')
-SELECT '{0}', '{1}'
-WHERE NOT EXISTS(SELECT 1 FROM tb_subject WHERE response = '{1}' AND trigger = '{0}')
-		""".format(trigger, response)
+INSERT INTO tb_word('data') 
+SELECT '{0}' 
+WHERE NOT EXISTS(SELECT 1 FROM tb_word WHERE data = '{0}')
+		"""
+		cursor.execute(sql.format(w))
+		DB.conn.commit()
+		gid = cursor.lastrowid
+		cursor.close()
+		return gid
+
+	@staticmethod
+	def saveSentence(sent):
+		cursor = DB.connection().cursor()
+		sent = sent.replace("'", "`")
+		sql = """
+INSERT INTO tb_sentence('data') 
+SELECT '{0}' 
+WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
+		"""
+		cursor.execute(sql.format(sent))
+		DB.conn.commit()
+		gid = cursor.lastrowid
+		cursor.close()
+		return gid
+	
+	@staticmethod
+	def saveTrigger(word, sentence):
+		wid = DB.wordID(word)
+		sid = DB.sentenceID(sentence)
+		if wid is None: wid = DB.saveWord(word)
+		if sid is None: sid = DB.saveSentence(sentence)
+
+		sql = "INSERT INTO tb_trigger('trigger', 'response') VALUES({0}, {1})".format(wid, sid)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		DB.conn.commit()
 		cursor.close()
-
+	
 	@staticmethod
-	def fetch(trigger):
-		sql = "SELECT response FROM tb_subject WHERE trigger LIKE '{0}'".format('%'+trigger+'%')
+	def saveTriggers(triggers):
 		cursor = DB.connection().cursor()
-		cursor.execute(sql)
-		recs = cursor.fetchall()
-		rets = []
-		for r in recs:
-			rets.append(r[0])
+		for word, sentence in triggers:
+			wid = DB.wordID(word)
+			sid = DB.sentenceID(sentence)
+			if wid is None: wid = DB.saveWord(word)
+			if sid is None: sid = DB.saveSentence(sentence)
+			sql = "INSERT INTO tb_trigger('trigger', 'response') VALUES({0}, {1})".format(wid, sid)
+			cursor.execute(sql)
+		DB.conn.commit()
 		cursor.close()
-		return rets
-
+	
 	@staticmethod
-	def randomSubject(count):
-		sql = "SELECT trigger FROM tb_subject ORDER BY RANDOM() LIMIT " + str(count)
-		cursor = DB.connection().cursor()
-		cursor.execute(sql)
-		recs = cursor.fetchall()
-		rets = []
-		for r in recs:
-			rets.append(r[0])
-		cursor.close()
-		return rets
-
-	@staticmethod
-	def fetchMulti(triggers):
-		fm = ",".join(list(map(lambda x: "'{0}'".format(x), triggers)))
-		sql = "SELECT response FROM tb_subject WHERE trigger IN ({0})".format(fm)
+	def randomWords(count):
+		sql = "SELECT data FROM tb_word ORDER BY RANDOM() LIMIT " + str(count)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		recs = cursor.fetchall()

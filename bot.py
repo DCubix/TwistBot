@@ -13,15 +13,20 @@ class TwistBot(discord.Client):
 		self.words = {}
 		self.maxMessageBeforeMine = 30
 		self.messageCount = 0
-		self.maxWords = 6
+		self.maxWords = 4
 		self.learn = False
 
-		self.subject = []#SubjectDAO.randomSubject(self.maxWords)
-		#await self.changeStatus('{0}'.format(self.subject[0].upper()))
+		self.subject = DB.randomWords(self.maxWords)
+		await self.changeStatus('"{0}"'.format(self.subject[0]))
 
 	async def on_message(self, message):
 		if message.author == self.user:
 			return
+		if message.author.bot:
+			return
+
+		is_dm = message.channel.type == 'private'
+		print(message.content)
 
 		cmdmsg = message.content.lower()
 		if 'thinking' in cmdmsg and 'twist' in cmdmsg and 'what' in cmdmsg:
@@ -40,54 +45,52 @@ class TwistBot(discord.Client):
 		words = list(map(_cleanup, words))
 
 		excludes = DB.getExcludes()
-		for w in words:
-			if len(w) < 2 or w in excludes:
-				continue
-			if w not in self.words.keys():
-				self.words[w] = 0
+
+		# group and filter them
+		groupedWords = []
+		while len(words) > 0:
+			w = words.pop(0).strip()
+			if len(w) == 0: continue
+			if w in excludes: continue
+			while len(w) < 4 and len(words) > 0:
+				w += " " + words.pop(0).strip()
+			groupedWords.append(w.strip())
+
+		if len(self.words.keys()) >= 100:
+			self.subject = DB.randomWords(self.maxWords)
+			await self.changeStatus('"{0}"'.format(self.subject[0]))
+			self.words = {}
+
+		for w in groupedWords:
+			DB.saveTrigger(w, msg)
+			if w not in self.words.keys(): self.words[w] = 0
 			self.words[w] += 1
 
-			#SubjectDAO.put(w, msg)
+		sortedWords = collections.OrderedDict(sorted(self.words.items(), key=lambda kv: kv[1], reverse=True))
+		if len(sortedWords.items()) >= self.maxWords:
+			await asyncio.sleep(5)
+			self.subject = list(sortedWords.keys())[:self.maxWords]
+			await self.changeStatus('"{0}"'.format(self.subject[0]))
+			print(self.subject)
 
 		shouldSendMessage = random.randint(0, 100) <= 30
 
-		# shouldPickRandomSubject = random.randint(0, 100) <= 5
-		# if shouldPickRandomSubject:
-		# 	self.subject = SubjectDAO.randomSubject(self.maxWords)
-		# 	print(self.subject)
-		# 	await self.changeStatus('{0}'.format(self.subject[0].upper()))
-
-		self.messageCount += 1
-		if self.messageCount >= self.maxMessageBeforeMine:
-			self.messageCount = 0
-			print(self.words)
-
-			await asyncio.sleep(10)
-
-			sortedWords = collections.OrderedDict(sorted(self.words.items(), key=lambda kv: kv[1], reverse=True))
-			if len(sortedWords.keys()) >= self.maxWords:
-				top = list(sortedWords.keys())[:self.maxWords]
-
-				self.words = {}
-
-				self.subject = top
-				await self.changeStatus('{0}'.format(top[0].upper()))
-				print(self.subject)
-
-		if self.messageCount >= 0 and self.messageCount <= self.maxMessageBeforeMine // 2:
-			if not self.learn and shouldSendMessage and len(self.subject) >= self.maxWords:
-				subs = list(map(_cleanup, self.subject))
-
-				lst = []#SubjectDAO.fetchMulti(subs + words)
-				if len(lst) > 0:
-					msg = random.choice(lst)
-					await asyncio.sleep(5)
+		if not self.learn and len(self.subject) >= self.maxWords and shouldSendMessage:
+			subs = list(map(_cleanup, groupedWords + self.subject))
+			lst = DB.getResponse(subs)
+			if len(lst) > 0:
+				msg = random.choice(lst)
+				typingTimeSecs = len(msg) * 0.1
+				async with message.channel.typing():
+					await asyncio.sleep(1 + typingTimeSecs)
+				if not is_dm:
 					await message.channel.send(msg.replace("`", "'"))
+				else:
+					await message.author.send(msg.replace("`", "'"))
 
-# client = TwistBot()
-# tok = ''
-# with open('__tok.dat', 'r') as f:
-# 	tok = f.read().strip(' \n\r')
-# client.run(tok)
-DB.connection()
+client = TwistBot()
+tok = ''
+with open('__tok.dat', 'r') as f:
+	tok = f.read().strip(' \n\r')
+client.run(tok)
 DB.close()

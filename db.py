@@ -48,7 +48,6 @@ class DB:
 			DB.conn = sqlite3.connect('tb_data.db')
 			cursor = DB.conn.cursor()
 			for sql in dbsql.split(';'):
-				print(sql)
 				cursor.execute(sql)
 			DB.conn.commit()
 			cursor.close()
@@ -75,6 +74,7 @@ class DB:
 
 	@staticmethod
 	def wordID(w):
+		w = w.replace("'", "`")
 		sql = "SELECT id FROM tb_word WHERE data = '{0}'".format(w)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
@@ -87,6 +87,7 @@ class DB:
 
 	@staticmethod
 	def sentenceID(s):
+		s = s.replace("'", "`")
 		sql = "SELECT id FROM tb_sentence WHERE data = '{0}'".format(s)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
@@ -102,8 +103,8 @@ class DB:
 		cursor = DB.connection().cursor()
 		w = w.replace("'", "`")
 		sql = """
-INSERT INTO tb_word('data') 
-SELECT '{0}' 
+INSERT INTO tb_word('data')
+SELECT '{0}'
 WHERE NOT EXISTS(SELECT 1 FROM tb_word WHERE data = '{0}')
 		"""
 		cursor.execute(sql.format(w))
@@ -117,8 +118,8 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_word WHERE data = '{0}')
 		cursor = DB.connection().cursor()
 		sent = sent.replace("'", "`")
 		sql = """
-INSERT INTO tb_sentence('data') 
-SELECT '{0}' 
+INSERT INTO tb_sentence('data')
+SELECT '{0}'
 WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 		"""
 		cursor.execute(sql.format(sent))
@@ -126,7 +127,7 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 		gid = cursor.lastrowid
 		cursor.close()
 		return gid
-	
+
 	@staticmethod
 	def saveTrigger(word, sentence):
 		wid = DB.wordID(word)
@@ -139,7 +140,7 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 		cursor.execute(sql)
 		DB.conn.commit()
 		cursor.close()
-	
+
 	@staticmethod
 	def saveTriggers(triggers):
 		cursor = DB.connection().cursor()
@@ -152,7 +153,7 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 			cursor.execute(sql)
 		DB.conn.commit()
 		cursor.close()
-	
+
 	@staticmethod
 	def randomWords(count):
 		sql = "SELECT data FROM tb_word ORDER BY RANDOM() LIMIT " + str(count)
@@ -163,4 +164,24 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 		for r in recs:
 			rets.append(r[0])
 		cursor.close()
-		return rets
+		return list(map(lambda x: x.replace("`", "'"), rets))
+
+	@staticmethod
+	def getResponse(triggers):
+		opts = ", ".join(list(map(lambda x: "'{0}'".format(x), triggers)))
+		sql = """
+SELECT DISTINCT
+	s.data AS response
+FROM tb_trigger t
+	INNER JOIN tb_word w ON w.id == t.trigger
+	INNER JOIN tb_sentence s ON s.id == t.response
+WHERE w.data in ({0})
+		""".format(opts)
+		cursor = DB.connection().cursor()
+		cursor.execute(sql)
+		recs = cursor.fetchall()
+		rets = []
+		for r in recs:
+			rets.append(r[0])
+		cursor.close()
+		return list(map(lambda x: x.replace("`", "'"), rets))

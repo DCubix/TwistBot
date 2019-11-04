@@ -60,8 +60,8 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_subject WHERE response = '{1}' AND trigger = '
 		return rets
 
 	@staticmethod
-	def randomSubject():
-		sql = "SELECT trigger FROM tb_subject ORDER BY RANDOM() LIMIT 4"
+	def randomSubject(count):
+		sql = "SELECT trigger FROM tb_subject ORDER BY RANDOM() LIMIT " + str(count)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		recs = cursor.fetchall()

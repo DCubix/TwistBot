@@ -13,9 +13,10 @@ class TwistBot(discord.Client):
 		self.words = {}
 		self.maxMessageBeforeMine = 30
 		self.messageCount = 0
+		self.maxWords = 6
 		self.learn = False
 
-		self.subject = SubjectDAO.randomSubject()
+		self.subject = SubjectDAO.randomSubject(self.maxWords)
 		await self.changeStatus('{0}'.format(self.subject[0].upper()))
 
 	async def on_message(self, message):
@@ -52,7 +53,7 @@ class TwistBot(discord.Client):
 
 		# shouldPickRandomSubject = random.randint(0, 100) <= 5
 		# if shouldPickRandomSubject:
-		# 	self.subject = SubjectDAO.randomSubject()
+		# 	self.subject = SubjectDAO.randomSubject(self.maxWords)
 		# 	print(self.subject)
 		# 	await self.changeStatus('{0}'.format(self.subject[0].upper()))
 
@@ -64,17 +65,17 @@ class TwistBot(discord.Client):
 			await asyncio.sleep(10)
 
 			sortedWords = collections.OrderedDict(sorted(self.words.items(), key=lambda kv: kv[1], reverse=True))
-			if len(sortedWords.keys()) >= 4:
-				top4 = list(sortedWords.keys())[:4]
+			if len(sortedWords.keys()) >= self.maxWords:
+				top = list(sortedWords.keys())[:self.maxWords]
 
 				self.words = {}
 
-				self.subject = top4
-				await self.changeStatus('{0}'.format(top4[0].upper()))
+				self.subject = top
+				await self.changeStatus('{0}'.format(top[0].upper()))
 				print(self.subject)
 
 		if self.messageCount >= 0 and self.messageCount <= self.maxMessageBeforeMine // 2:
-			if not self.learn and shouldSendMessage and len(self.subject) >= 4:
+			if not self.learn and shouldSendMessage and len(self.subject) >= self.maxWords:
 				subs = list(map(_cleanup, self.subject))
 
 				lst = SubjectDAO.fetchMulti(subs + words)

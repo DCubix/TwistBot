@@ -37,7 +37,11 @@ class SubjectDAO:
 	@staticmethod
 	def put(trigger, response):
 		response = response.replace("'", "`")
-		sql = "INSERT INTO tb_subject('trigger', 'response') VALUES('{0}', '{1}')".format(trigger, response)
+		sql = """
+INSERT INTO tb_subject('trigger', 'response')
+SELECT '{0}', '{1}'
+WHERE NOT EXISTS(SELECT 1 FROM tb_subject WHERE response = '{1}' AND trigger = '{0}')
+		""".format(trigger, response)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		DB.conn.commit()

@@ -37,14 +37,13 @@ class TwistBot(discord.Client):
 			if 'thinking' in cmdmsg and 'about' in cmdmsg:
 				subs = 'nothing' if len(self.subject) == 0 else ', '.join(self.subject)
 				await message.channel.send("I'm thinking about `{0}` right now.".format(subs))
-				return
 			elif 'word' in cmdmsg and 'random' in cmdmsg:
 				words = ' '.join(DB.randomWords(random.randint(2, 5)))
 				await message.channel.send(words)
-				return
+			return
 
 		def _cleanup(x):
-			return re.sub(r'[^0-9a-zA-Z_\-]+', '', x)
+			return re.sub(r'[^\W\-]+', '', x)
 
 		msg = discord.utils.escape_mentions(message.content)
 		msg = re.sub(r'<@.*>', '', msg).strip()

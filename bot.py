@@ -13,7 +13,7 @@ class TwistBot(discord.Client):
 		self.words = {}
 		self.maxMessageBeforeMine = 30
 		self.messageCount = 0
-		self.learn = False
+		self.learn = True
 
 		self.subject = SubjectDAO.randomSubject()
 		await self.changeStatus('{0}'.format(self.subject[0].upper()))
@@ -48,16 +48,17 @@ class TwistBot(discord.Client):
 			SubjectDAO.put(w, msg)
 
 		shouldSendMessage = random.randint(0, 100) <= 40 # 40% of chance to send a message
-		shouldPickRandomSubject = random.randint(0, 100) <= 5
 
-		if shouldPickRandomSubject:
-			self.subject = SubjectDAO.randomSubject()
-			print(self.subject)
-			await self.changeStatus('{0}'.format(self.subject[0].upper()))
+		# shouldPickRandomSubject = random.randint(0, 100) <= 5
+		# if shouldPickRandomSubject:
+		# 	self.subject = SubjectDAO.randomSubject()
+		# 	print(self.subject)
+		# 	await self.changeStatus('{0}'.format(self.subject[0].upper()))
 
 		self.messageCount += 1
 		if self.messageCount >= self.maxMessageBeforeMine:
 			self.messageCount = 0
+			print(self.words)
 
 			await asyncio.sleep(10)
 

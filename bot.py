@@ -43,6 +43,7 @@ class TwistBot(discord.Client):
 			return
 
 		def _cleanup(x):
+			x = x.replace("'", "`")
 			return re.sub(r'[^\W\-]+', '', x)
 
 		msg = discord.utils.escape_mentions(message.content)

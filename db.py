@@ -168,7 +168,7 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 
 	@staticmethod
 	def getResponse(triggers):
-		opts = ", ".join(list(map(lambda x: "'{0}'".format(x), triggers)))
+		opts = ", ".join(list(map(lambda x: "'{0}'".format(x.replace("'", "`")), triggers)))
 		sql = """
 SELECT DISTINCT
 	s.data AS response

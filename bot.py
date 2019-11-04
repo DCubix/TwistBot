@@ -33,10 +33,15 @@ class TwistBot(discord.Client):
 			for w in self.subject: self.words[mid][w] = 1
 
 		cmdmsg = message.content.lower()
-		if 'thinking' in cmdmsg and 'twist' in cmdmsg and 'what' in cmdmsg:
-			subs = 'nothing' if len(self.subject) == 0 else ', '.join(self.subject)
-			await message.channel.send("I'm thinking about `{0}` right now.".format(subs))
-			return
+		if 'twist' in cmdmsg:
+			if 'thinking' in cmdmsg and 'about' in cmdmsg:
+				subs = 'nothing' if len(self.subject) == 0 else ', '.join(self.subject)
+				await message.channel.send("I'm thinking about `{0}` right now.".format(subs))
+				return
+			elif 'word' in cmdmsg and 'random' in cmdmsg:
+				words = ' '.join(DB.randomWords(random.randint(2, 5)))
+				await message.channel.send(words)
+				return
 
 		def _cleanup(x):
 			return re.sub(r'[^0-9a-zA-Z_\-]+', '', x)

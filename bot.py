@@ -83,13 +83,19 @@ class TwistBot(discord.Client):
 			lst = DB.getResponse(subs)
 			if len(lst) > 0:
 				msg = random.choice(lst)
+				msg = msg.replace("`", "'")
+
+				if '<name>' in msg:
+					randName = DB.randomName()
+					msg = msg.replace('<name>', randName if randName is not None else random.choice(['dude', 'man', 'bruh', 'bro', 'lad']))
+
 				typingTimeSecs = len(msg) * 0.1
 				async with message.channel.typing():
 					await asyncio.sleep(1 + typingTimeSecs)
 				if not is_dm:
-					await message.channel.send(msg.replace("`", "'"))
+					await message.channel.send(msg)
 				else:
-					await message.author.send(msg.replace("`", "'"))
+					await message.author.send(msg)
 
 				#self.subject = []
 				#await self.changeStatus('nothing')

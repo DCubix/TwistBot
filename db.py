@@ -79,6 +79,18 @@ class DB:
 		return rets[0] if len(rets) > 0 else None
 
 	@staticmethod
+	def randomName():
+		sql = "SELECT display_name FROM tb_user ORDER BY random() LIMIT 1"
+		cursor = DB.connection().cursor()
+		cursor.execute(sql)
+		recs = cursor.fetchall()
+		rets = []
+		for r in recs:
+			rets.append(r[0])
+		cursor.close()
+		return rets[0] if len(rets) > 0 else None
+
+	@staticmethod
 	def saveUser(name, displayName):
 		uid = DB.userID(name)
 		cursor = DB.connection().cursor()

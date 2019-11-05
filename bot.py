@@ -1,5 +1,8 @@
-import discord, collections, random, re, asyncio, time
+import discord, collections, random, re, asyncio, time, nltk, subprocess
 from db import DB
+from textblob import TextBlob
+
+subprocess.check_output(['python3', '-m', 'textblob.download_corpora'])
 
 class TwistBot(discord.Client):
 	async def changeStatus(self, status):
@@ -13,10 +16,10 @@ class TwistBot(discord.Client):
 		self.words = {}
 		self.maxMessageBeforeMine = 20
 		self.messageCount = 0
-		self.maxWords = 3
+		self.maxWords = 4
 		self.learn = False
 
-		self.subject = []#DB.randomWords(self.maxWords)
+		self.subject = []
 		await self.changeStatus('nothing')
 
 	async def on_message(self, message):
@@ -44,54 +47,62 @@ class TwistBot(discord.Client):
 		msg = discord.utils.escape_mentions(message.content)
 
 		# Cleanup
-		msg = re.sub(r'<@.*>', '<name>', msg).strip() # Mentions
+		msg = re.sub(r'<@.*>', 'twistbot', msg).strip() # Mentions
 		msg = re.sub(r'<:.*>', '', msg).strip() # Custom emoji
 		msg = re.sub(re.compile(r'```.*```', re.DOTALL), '', msg).strip() # Code
-		msg = re.sub(re.compile(r'twist.*?(?:\W|$)', re.IGNORECASE), '<name> ', msg).strip() # "Twist"
 
-		words = list(filter(lambda x: x != '<name>', msg.lower().split()))
-		words = list(map(_cleanup, words))
+		msg = TextBlob(msg)
 
+		words = msg.words.lemmatize()
+		words = list(filter(lambda x: x != 'twistbot', words))
+		words = list(map(lambda x: x.lower(), words))
+		print('WORDS: ' + str(words))
 		excludes = DB.getExcludes()
 
-		# group and filter them
-		groupedWords = []
-		while len(words) > 0:
-			w = words.pop(0).strip()
-			if len(w) == 0: continue
-			if w in excludes: continue
-			while len(w) < 4 and len(words) > 0:
-				w += " " + words.pop(0).strip()
-			groupedWords.append(w.strip())
+		for w in words:
 
-		for w in groupedWords:
+			if w in excludes: continue
 			DB.saveTrigger(w.replace("'", "`"), msg.replace("'", "`"))
+
 			if w not in self.words.keys(): self.words[w] = 0
 			self.words[w] += 1
 
 		sortedWords = collections.OrderedDict(sorted(self.words.items(), key=lambda kv: kv[1], reverse=True))
-		if len(sortedWords.items()) >= self.maxWords:
-			print("CONTEXT: " + repr(list(sortedWords.items())[:self.maxWords]))
-			self.subject = list(sortedWords.keys())[:self.maxWords]
+		count = len(sortedWords.items())
+		if count > 0:
+			ctx = list(sortedWords.items())[:(count if count < self.maxWords else self.maxWords)]
+			print("CONTEXT: " + str(ctx))
+
+			self.subject = [k for k, _ in ctx]
 			await self.changeStatus('"{0}"'.format(self.subject[0]))
 
 		shouldSendMessage = random.randint(0, 1000) < 500 #self.messageCount % self.maxMessageBeforeMine == 0
 		# self.messageCount += 1
 
-		if not self.learn and len(self.subject) >= self.maxWords and shouldSendMessage:
-			subs = list(map(_cleanup, self.subject))
+		if not self.learn and len(self.subject) > 0 and shouldSendMessage:
+			subsUc = self.subject + words
+			random.shuffle(subsUc)
+
+			subs = list(map(_cleanup, subsUc))
 			lst = DB.getResponse(subs)
 			if len(lst) > 0:
-				msg = random.choice(lst)
-				msg = msg.replace("`", "'")
+				msg = TextBlob(random.choice(lst))
+				nouns = msg.noun_phrases
 
-				if '<name>' in msg:
-					randName = DB.randomName().split()[0]
-					msg = msg.replace('<name>', randName if randName is not None else random.choice(['dude', 'man', 'bruh', 'bro', 'lad']))
+				msg = str(msg)
+
+				randName = DB.randomName()
+				msg = re.sub(re.compile(r'twistbot', re.IGNORECASE), randName, msg)
+				randName = DB.randomName()
+				msg = re.sub(re.compile(r'<name>', re.IGNORECASE), randName, msg)
+
+				msg = TextBlob(msg.replace("`", "'"))
+				msg.correct()
 
 				typingTimeSecs = len(msg) * 0.1
 				async with message.channel.typing():
 					await asyncio.sleep(1 + typingTimeSecs)
+
 				if not is_dm:
 					await message.channel.send(msg)
 				else:

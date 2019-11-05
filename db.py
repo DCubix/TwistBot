@@ -1,4 +1,4 @@
-import sqlite3
+import sqlite3, random
 
 dbsql = """
 PRAGMA foreign_keys = ON;
@@ -88,7 +88,7 @@ class DB:
 		for r in recs:
 			rets.append(r[0])
 		cursor.close()
-		return rets[0] if len(rets) > 0 else None
+		return rets[0] if len(rets) > 0 else random.choice(['buddy', 'bruh', 'dude', 'lad'])
 
 	@staticmethod
 	def saveUser(name, displayName):

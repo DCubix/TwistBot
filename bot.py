@@ -47,7 +47,7 @@ class TwistBot(discord.Client):
 		msg = re.sub(r'<@.*>', '<name>', msg).strip() # Mentions
 		msg = re.sub(r'<:.*>', '', msg).strip() # Custom emoji
 		msg = re.sub(re.compile(r'```.*```', re.DOTALL), '', msg).strip() # Code
-		msg = re.sub(re.compile(r'twist.*?(?=\W)', re.IGNORECASE), '<name>', msg).strip() # "Twist"
+		msg = re.sub(re.compile(r'twist.*?(?:\W|$)', re.IGNORECASE), '<name> ', msg).strip() # "Twist"
 
 		words = msg.lower().split()
 		words = list(map(_cleanup, words))

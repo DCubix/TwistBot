@@ -81,6 +81,7 @@ class DB:
 	@staticmethod
 	def saveUser(name, displayName):
 		uid = DB.userID(name)
+		cursor = DB.connection().cursor()
 		if uid is not None:
 			sql = "UPDATE tb_user SET display_name = '{0}' WHERE name = '{1}'".format(displayName.replace("'", "`"), name.replace("'", "`"))
 			cursor.execute(sql)

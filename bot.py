@@ -23,6 +23,8 @@ class TwistBot(discord.Client):
 		if message.author == self.user:
 			return
 
+		DB.saveUser(message.author.name, message.author.display_name)
+
 		is_dm = message.channel.type == 'private'
 
 		cmdmsg = message.content.lower()
@@ -42,11 +44,10 @@ class TwistBot(discord.Client):
 		msg = discord.utils.escape_mentions(message.content)
 
 		# Cleanup
-		msg = re.sub(r'<.*>', '', msg).strip()
-		msg = re.sub(r'<@.*>', '', msg).strip() # Mentions
+		msg = re.sub(r'<@.*>', '<name>', msg).strip() # Mentions
 		msg = re.sub(r'<:.*>', '', msg).strip() # Custom emoji
 		msg = re.sub(re.compile(r'```.*```', re.DOTALL), '', msg).strip() # Code
-		msg = re.sub(re.compile(r'twist.*?(?=\W)', re.IGNORECASE), '<NAME>', msg).strip() # "Twist"
+		msg = re.sub(re.compile(r'twist.*?(?=\W)', re.IGNORECASE), '<name>', msg).strip() # "Twist"
 
 		words = msg.lower().split()
 		words = list(map(_cleanup, words))
@@ -74,7 +75,7 @@ class TwistBot(discord.Client):
 			self.subject = list(sortedWords.keys())[:self.maxWords]
 			await self.changeStatus('"{0}"'.format(self.subject[0]))
 
-		shouldSendMessage = self.messageCount % self.maxMessageBeforeMine == 0
+		shouldSendMessage = random.randint(0, 1000) < 300 #self.messageCount % self.maxMessageBeforeMine == 0
 		self.messageCount += 1
 
 		if not self.learn and len(self.subject) >= self.maxWords and shouldSendMessage:
@@ -90,9 +91,9 @@ class TwistBot(discord.Client):
 				else:
 					await message.author.send(msg.replace("`", "'"))
 
-				self.subject = []
-				await self.changeStatus('nothing')
-				self.words = {}
+				#self.subject = []
+				#await self.changeStatus('nothing')
+				#self.words = {}
 
 client = TwistBot()
 tok = ''

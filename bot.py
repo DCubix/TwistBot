@@ -13,7 +13,7 @@ class TwistBot(discord.Client):
 		self.words = {}
 		self.maxMessageBeforeMine = 20
 		self.messageCount = 0
-		self.maxWords = 8
+		self.maxWords = 3
 		self.learn = False
 
 		self.subject = []#DB.randomWords(self.maxWords)
@@ -75,8 +75,8 @@ class TwistBot(discord.Client):
 			self.subject = list(sortedWords.keys())[:self.maxWords]
 			await self.changeStatus('"{0}"'.format(self.subject[0]))
 
-		shouldSendMessage = random.randint(0, 1000) < 300 #self.messageCount % self.maxMessageBeforeMine == 0
-		self.messageCount += 1
+		shouldSendMessage = random.randint(0, 1000) < 500 #self.messageCount % self.maxMessageBeforeMine == 0
+		# self.messageCount += 1
 
 		if not self.learn and len(self.subject) >= self.maxWords and shouldSendMessage:
 			subs = list(map(_cleanup, self.subject))

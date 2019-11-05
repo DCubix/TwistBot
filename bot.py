@@ -11,26 +11,19 @@ class TwistBot(discord.Client):
 		print('Logged in as {0}.'.format(self.user))
 
 		self.words = {}
-		self.maxMessageBeforeMine = 30
+		self.maxMessageBeforeMine = 20
 		self.messageCount = 0
-		self.maxWords = 8
+		self.maxWords = 6
 		self.learn = False
 
-		self.subject = DB.randomWords(self.maxWords)
-		await self.changeStatus('"{0}"'.format(self.subject[0]))
+		self.subject = []#DB.randomWords(self.maxWords)
+		await self.changeStatus('nothing')
 
 	async def on_message(self, message):
 		if message.author == self.user:
 			return
-		#if message.author.bot:
-		#	return
 
 		is_dm = message.channel.type == 'private'
-
-		mid = message.channel.id if not is_dm else message.author.id
-		if not mid in self.words.keys():
-			self.words[mid] = {}
-			for w in self.subject: self.words[mid][w] = 1
 
 		cmdmsg = message.content.lower()
 		if 'twist' in cmdmsg:
@@ -43,7 +36,6 @@ class TwistBot(discord.Client):
 			return
 
 		def _cleanup(x):
-			x = x.replace("'", "`")
 			return re.sub(r'[^\W\-]+', '', x)
 
 		msg = discord.utils.escape_mentions(message.content)
@@ -65,36 +57,36 @@ class TwistBot(discord.Client):
 				w += " " + words.pop(0).strip()
 			groupedWords.append(w.strip())
 
-		if len(self.words[mid].keys()) >= 100:
-			self.subject = DB.randomWords(self.maxWords)
-			await self.changeStatus('"{0}"'.format(self.subject[0]))
-			self.words[mid] = {}
-
 		for w in groupedWords:
-			DB.saveTrigger(w, msg)
-			if w not in self.words[mid].keys(): self.words[mid][w] = 0
-			self.words[mid][w] += 1
+			DB.saveTrigger(w.replace("'", "`"), msg.replace("'", "`"))
+			if w not in self.words.keys(): self.words[w] = 0
+			self.words[w] += 1
 
-		sortedWords = collections.OrderedDict(sorted(self.words[mid].items(), key=lambda kv: kv[1], reverse=True))
+		sortedWords = collections.OrderedDict(sorted(self.words.items(), key=lambda kv: kv[1], reverse=True))
 		if len(sortedWords.items()) >= self.maxWords:
+			print("CONTEXT: " + repr(sortedWords.items()[:self.maxWords]))
 			self.subject = list(sortedWords.keys())[:self.maxWords]
 			await self.changeStatus('"{0}"'.format(self.subject[0]))
-			print(self.subject)
 
-		shouldSendMessage = random.randint(0, 100) <= 30
+		shouldSendMessage = self.messageCount % self.maxMessageBeforeMine == 0
+		self.messageCount += 1
 
 		if not self.learn and len(self.subject) >= self.maxWords and shouldSendMessage:
 			subs = list(map(_cleanup, groupedWords + self.subject))
 			lst = DB.getResponse(subs)
 			if len(lst) > 0:
 				msg = random.choice(lst)
-				typingTimeSecs = len(msg) * 0.08
+				typingTimeSecs = len(msg) * 0.1
 				async with message.channel.typing():
 					await asyncio.sleep(1 + typingTimeSecs)
 				if not is_dm:
 					await message.channel.send(msg.replace("`", "'"))
 				else:
 					await message.author.send(msg.replace("`", "'"))
+
+				self.subject = []
+				await self.changeStatus('nothing')
+				self.words = {}
 
 client = TwistBot()
 tok = ''

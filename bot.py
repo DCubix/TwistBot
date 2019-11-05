@@ -39,7 +39,7 @@ class TwistBot(discord.Client):
 				return
 
 		def _cleanup(x):
-			return re.sub(r'[\W\-]+', '', x)
+			return re.sub(r'[\W\-\?!\']+', '', x)
 
 		msg = discord.utils.escape_mentions(message.content)
 
@@ -86,7 +86,7 @@ class TwistBot(discord.Client):
 				msg = msg.replace("`", "'")
 
 				if '<name>' in msg:
-					randName = DB.randomName()
+					randName = DB.randomName().split()[0]
 					msg = msg.replace('<name>', randName if randName is not None else random.choice(['dude', 'man', 'bruh', 'bro', 'lad']))
 
 				typingTimeSecs = len(msg) * 0.1

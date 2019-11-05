@@ -13,7 +13,7 @@ class TwistBot(discord.Client):
 		self.words = {}
 		self.maxMessageBeforeMine = 20
 		self.messageCount = 0
-		self.maxWords = 6
+		self.maxWords = 8
 		self.learn = False
 
 		self.subject = []#DB.randomWords(self.maxWords)
@@ -31,7 +31,7 @@ class TwistBot(discord.Client):
 		if 'twist' in cmdmsg:
 			if 'thinking' in cmdmsg and 'about' in cmdmsg:
 				subs = 'nothing' if len(self.subject) == 0 else ', '.join(self.subject)
-				await message.channel.send("I'm thinking about `{0}` right now.".format(subs))
+				await message.channel.send("I'm thinking about `{0}`.".format(subs))
 				return
 			elif 'word' in cmdmsg and 'random' in cmdmsg:
 				words = ' '.join(DB.randomWords(random.randint(2, 5)))
@@ -49,7 +49,7 @@ class TwistBot(discord.Client):
 		msg = re.sub(re.compile(r'```.*```', re.DOTALL), '', msg).strip() # Code
 		msg = re.sub(re.compile(r'twist.*?(?:\W|$)', re.IGNORECASE), '<name> ', msg).strip() # "Twist"
 
-		words = msg.lower().split()
+		words = list(filter(lambda x: x != '<name>', msg.lower().split()))
 		words = list(map(_cleanup, words))
 
 		excludes = DB.getExcludes()
@@ -79,7 +79,7 @@ class TwistBot(discord.Client):
 		self.messageCount += 1
 
 		if not self.learn and len(self.subject) >= self.maxWords and shouldSendMessage:
-			subs = list(map(_cleanup, groupedWords + self.subject))
+			subs = list(map(_cleanup, self.subject))
 			lst = DB.getResponse(subs)
 			if len(lst) > 0:
 				msg = random.choice(lst)

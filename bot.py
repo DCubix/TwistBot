@@ -30,18 +30,24 @@ class TwistBot(discord.Client):
 			if 'thinking' in cmdmsg and 'about' in cmdmsg:
 				subs = 'nothing' if len(self.subject) == 0 else ', '.join(self.subject)
 				await message.channel.send("I'm thinking about `{0}` right now.".format(subs))
+				return
 			elif 'word' in cmdmsg and 'random' in cmdmsg:
 				words = ' '.join(DB.randomWords(random.randint(2, 5)))
 				await message.channel.send(words)
-			return
+				return
 
 		def _cleanup(x):
-			return re.sub(r'[^\W\-]+', '', x)
+			return re.sub(r'[\W\-]+', '', x)
 
 		msg = discord.utils.escape_mentions(message.content)
-		msg = re.sub(r'<@.*>', '', msg).strip()
-		msg = re.sub(r'<:.*>', '', msg).strip()
-		msg = re.sub(re.compile(r'```.*```', re.DOTALL), '', msg).strip()
+
+		# Cleanup
+		msg = re.sub(r'<.*>', '', msg).strip()
+		msg = re.sub(r'<@.*>', '', msg).strip() # Mentions
+		msg = re.sub(r'<:.*>', '', msg).strip() # Custom emoji
+		msg = re.sub(re.compile(r'```.*```', re.DOTALL), '', msg).strip() # Code
+		msg = re.sub(re.compile(r'twist.*?(?=\W)', re.IGNORECASE), '<NAME>', msg).strip() # "Twist"
+
 		words = msg.lower().split()
 		words = list(map(_cleanup, words))
 
@@ -64,7 +70,7 @@ class TwistBot(discord.Client):
 
 		sortedWords = collections.OrderedDict(sorted(self.words.items(), key=lambda kv: kv[1], reverse=True))
 		if len(sortedWords.items()) >= self.maxWords:
-			print("CONTEXT: " + repr(sortedWords.items()[:self.maxWords]))
+			print("CONTEXT: " + repr(list(sortedWords.items())[:self.maxWords]))
 			self.subject = list(sortedWords.keys())[:self.maxWords]
 			await self.changeStatus('"{0}"'.format(self.subject[0]))
 

@@ -8,6 +8,12 @@ CREATE TABLE IF NOT EXISTS tb_word(
 	data text
 );
 
+CREATE TABLE IF NOT EXISTS tb_user(
+	id integer primary key,
+	name text,
+	display_name text
+);
+
 CREATE TABLE IF NOT EXISTS tb_sentence(
 	id integer primary key,
 	data text
@@ -59,6 +65,35 @@ class DB:
 	@staticmethod
 	def close():
 		DB.conn.close()
+
+	@staticmethod
+	def userID(name):
+		sql = "SELECT id FROM tb_user WHERE name = '{0}'".format(name.replace("'", "`"))
+		cursor = DB.connection().cursor()
+		cursor.execute(sql)
+		recs = cursor.fetchall()
+		rets = []
+		for r in recs:
+			rets.append(r[0])
+		cursor.close()
+		return rets[0] if len(rets) > 0 else None
+
+	@staticmethod
+	def saveUser(name, displayName):
+		uid = DB.userID(name)
+		if uid is not None:
+			sql = "UPDATE tb_user SET display_name = '{0}' WHERE name = '{1}'".format(displayName.replace("'", "`"), name.replace("'", "`"))
+			cursor.execute(sql)
+			DB.conn.commit()
+			cursor.close()
+			return uid
+		else:
+			sql = "INSERT INTO tb_user('name', 'display_name') VALUES('{0}', '{1}')".format(name.replace("'", "`"), displayName.replace("'", "`"))
+			cursor.execute(sql)
+			DB.conn.commit()
+			gid = cursor.lastrowid
+			cursor.close()
+			return gid
 
 	@staticmethod
 	def getExcludes():

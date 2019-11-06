@@ -56,7 +56,10 @@ class TwistBot(discord.Client):
 		words = msg.words.lemmatize()
 		words = list(filter(lambda x: x != 'twistbot', words))
 		words = list(map(lambda x: x.lower(), words))
-		print('WORDS: ' + str(words))
+		try:
+			print('WORDS: ' + str(words))
+		except:
+			pass
 		excludes = DB.getExcludes()
 
 		for w in words:

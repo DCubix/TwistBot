@@ -1,20 +1,36 @@
 import discord, collections, random, re, asyncio, time
-from stemmer import PorterStemmer
+from threading import Thread
 from db import DB
 
 STOP_WORDS = ['ourselves', 'hers', 'between', 'yourself', 'but', 'again', 'there', 'about', 'once', 'during', 'out', 'very', 'having', 'with', 'they', 'own', 'an', 'be', 'some', 'for', 'do', 'its', 'yours', 'such', 'into', 'of', 'most', 'itself', 'other', 'off', 'is', 's', 'am', 'or', 'who', 'as', 'from', 'him', 'each', 'the', 'themselves', 'until', 'below', 'are', 'we', 'these', 'your', 'his', 'through', 'don', 'nor', 'me', 'were', 'her', 'more', 'himself', 'this', 'down', 'should', 'our', 'their', 'while', 'above', 'both', 'up', 'to', 'ours', 'had', 'she', 'all', 'no', 'when', 'at', 'any', 'before', 'them', 'same', 'and', 'been', 'have', 'in', 'will', 'on', 'does', 'yourselves', 'then', 'that', 'because', 'what', 'over', 'why', 'so', 'can', 'did', 'not', 'now', 'under', 'he', 'you', 'herself', 'has', 'just', 'where', 'too', 'only', 'myself', 'which', 'those', 'i', 'after', 'few', 'whom', 't', 'being', 'if', 'theirs', 'my', 'against', 'a', 'by', 'doing', 'it', 'how', 'further', 'was', 'here', 'than']
 
-class TwistBot(discord.Client):
-	def makeNGrams(self, words, size=2):
-		if size < 2: return words
-		ret = []
-		for i in range(len(words)-(size - 1)):
-			ngram = []
-			for j in range(size):
-				ngram.append(words[i + j])
-			ret.append(tuple(ngram))
-		return ret
+class DecayThread:
+	async def run(self, bot):
+		while True:
+			await asyncio.sleep(10)
 
+			todel = []
+			for k in bot.words.keys():
+				bot.words[k] -= 0.1
+				if bot.words[k] <= 0:
+					todel.append(k)
+			for w in todel:
+				del bot.words[w]
+
+			# set subject
+			sortedWords = collections.OrderedDict(sorted(bot.words.items(), key=lambda kv: kv[1], reverse=True))
+			count = len(sortedWords.items())
+			if count > 0:
+				ctx = list(sortedWords.items())[:(count if count < bot.maxWords else bot.maxWords)]
+				print("CONTEXT: " + str(ctx))
+
+				bot.subject = [k for k, _ in ctx]
+				await bot.changeStatus('{0}'.format(bot.subject[0]))
+			else:
+				bot.subject = []
+				await bot.changeStatus('nothing')
+
+class TwistBot(discord.Client):
 	async def changeStatus(self, status):
 		activity = discord.Activity(name=status, type=discord.ActivityType.watching)
 		await self.change_presence(activity=activity)
@@ -29,6 +45,9 @@ class TwistBot(discord.Client):
 		self.maxWords = 4
 		self.learn = False
 
+		asyncio.create_task(DecayThread().run(self))
+
+		self.previousWords = []
 		self.subject = []
 		await self.changeStatus('nothing')
 
@@ -36,6 +55,8 @@ class TwistBot(discord.Client):
 		if message.author == self.user:
 			return
 
+		if DB.userID(message.author.name) is None:
+			self.subject = ['hello', message.author.name, 'hi', 'hey']
 		DB.saveUser(message.author.name, message.author.display_name)
 
 		is_dm = message.channel.type == 'private'
@@ -52,7 +73,7 @@ class TwistBot(discord.Client):
 				return
 
 		def _cleanup(x):
-			return re.sub(r'[\W\-\?!\']+', '', x)
+			return re.sub(r'[^\w\d\'"]+', '', x)
 
 		msg = discord.utils.escape_mentions(message.content)
 
@@ -66,26 +87,14 @@ class TwistBot(discord.Client):
 		# Tokenize
 		words = msg.lower().split()
 
-		# Clean punctuation
-		words = list(map(_cleanup, words))
-
 		# Remove stop words
 		words = list(filter(lambda x: x != '<name>' and x not in STOP_WORDS, words))
 
-		# Stem
-		# stm = PorterStemmer()
-		# words = list(map(lambda x: stm.stem(x), words))
+		# Clean punctuation
+		words = list(map(_cleanup, words))
 
-		# Make n-grams (bi-grams)
-		# ngrams = self.makeNGrams(words)
-
-		# Join them
-		# words = [' '.join(v) for v in ngrams]
-
-		try:
-			print('WORDS: ' + str(words))
-		except:
-			pass
+		# Remove empties
+		words = list(filter(lambda x: len(x.strip()) > 0, words))
 		excludes = DB.getExcludes()
 
 		for w in words:
@@ -96,50 +105,26 @@ class TwistBot(discord.Client):
 			if w not in self.words.keys(): self.words[w] = 0
 			self.words[w] += 1
 
-		# sortedWords = collections.OrderedDict(sorted(self.words.items(), key=lambda kv: kv[1], reverse=True))
-		# count = len(sortedWords.items())
-		# if count > 0:
-		# 	ctx = list(sortedWords.items())[:(count if count < self.maxWords else self.maxWords)]
-		# 	print("CONTEXT: " + str(ctx))
+		shouldSendMessage = random.randint(0, 1000) < 400
+		if len(self.subject) > 0 and shouldSendMessage:
+			subs = self.subject
 
-		# 	self.subject = [k for k, _ in ctx]
-		# 	await self.changeStatus('"{0}"'.format(self.subject[0]))
+			lst = DB.getResponse(subs)
+			if len(lst) > 0:
+				msg = random.choice(lst)
+				randName = DB.randomName().split()[0]
+				msg = re.sub(re.compile(r'twistbot', re.IGNORECASE), randName, msg)
+				randName = DB.randomName().split()[0]
+				msg = re.sub(re.compile(r'<name>', re.IGNORECASE), randName, msg)
 
-		# shouldSendMessage = random.randint(0, 1000) < 500 #self.messageCount % self.maxMessageBeforeMine == 0
-		# # self.messageCount += 1
+				typingTimeSecs = len(msg) * 0.1
+				async with message.channel.typing():
+					await asyncio.sleep(1 + typingTimeSecs)
 
-		# if not self.learn and len(self.subject) > 0 and shouldSendMessage:
-		# 	subsUc = self.subject + words
-		# 	random.shuffle(subsUc)
-
-		# 	subs = list(map(_cleanup, subsUc))
-		# 	lst = DB.getResponse(subs)
-		# 	if len(lst) > 0:
-		# 		msg = TextBlob(random.choice(lst))
-		# 		nouns = msg.noun_phrases
-
-		# 		msg = str(msg)
-
-		# 		randName = DB.randomName()
-		# 		msg = re.sub(re.compile(r'twistbot', re.IGNORECASE), randName, msg)
-		# 		randName = DB.randomName()
-		# 		msg = re.sub(re.compile(r'<name>', re.IGNORECASE), randName, msg)
-
-		# 		msg = TextBlob(msg.replace("`", "'"))
-		# 		msg.correct()
-
-		# 		typingTimeSecs = len(msg) * 0.1
-		# 		async with message.channel.typing():
-		# 			await asyncio.sleep(1 + typingTimeSecs)
-
-		# 		if not is_dm:
-		# 			await message.channel.send(msg)
-		# 		else:
-		# 			await message.author.send(msg)
-
-				#self.subject = []
-				#await self.changeStatus('nothing')
-				#self.words = {}
+				if not is_dm:
+					await message.channel.send(msg)
+				else:
+					await message.author.send(msg)
 
 client = TwistBot()
 tok = ''

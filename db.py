@@ -223,8 +223,8 @@ SELECT DISTINCT
 FROM tb_trigger t
 	INNER JOIN tb_word w ON w.id == t.trigger
 	INNER JOIN tb_sentence s ON s.id == t.response
-WHERE w.data in ({0})
-		""".format(opts)
+WHERE w.data in ({0}) OR s.data LIKE '%{1}%'
+		""".format(opts, triggers[0].replace("'", "`"))
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		recs = cursor.fetchall()

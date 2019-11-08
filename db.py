@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS tb_user(
 
 CREATE TABLE IF NOT EXISTS tb_sentence(
 	id integer primary key,
-	data text
+	data text,
+	date_time real
 );
 
 CREATE TABLE IF NOT EXISTS tb_trigger(
@@ -166,8 +167,8 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_word WHERE data = '{0}')
 		cursor = DB.connection().cursor()
 		sent = sent.replace("'", "`")
 		sql = """
-INSERT INTO tb_sentence('data')
-SELECT '{0}'
+INSERT INTO tb_sentence('data', 'date_time')
+SELECT '{0}', julianday('now')
 WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 		"""
 		cursor.execute(sql.format(sent))
@@ -197,7 +198,7 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 			sid = DB.sentenceID(sentence)
 			if wid is None: wid = DB.saveWord(word)
 			if sid is None: sid = DB.saveSentence(sentence)
-			sql = "INSERT INTO tb_trigger('trigger', 'response') VALUES({0}, {1})".format(wid, sid)
+			sql = "INSERT INTO tb_trigger('trigger', 'response', 'date_time') VALUES({0}, {1}, julianday('now'))".format(wid, sid)
 			cursor.execute(sql)
 		DB.conn.commit()
 		cursor.close()
@@ -224,6 +225,7 @@ FROM tb_trigger t
 	INNER JOIN tb_word w ON w.id == t.trigger
 	INNER JOIN tb_sentence s ON s.id == t.response
 WHERE w.data in ({0}) OR s.data LIKE '%{1}%'
+ AND cast((julianday('now') - s.date_time) * 24 as INTEGER) >= 1
 		""".format(opts, triggers[0].replace("'", "`"))
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)

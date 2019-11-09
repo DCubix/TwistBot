@@ -14,7 +14,7 @@ async def messageAllowanceTime(bot):
 
 async def decayTask(bot):
 	while True:
-		await asyncio.sleep(10)
+		await asyncio.sleep(5)
 
 		todel = []
 		for k in bot.words.keys():
@@ -70,9 +70,15 @@ class TwistBot(discord.Client):
 		DB.saveUser(message.author.name, message.author.display_name)
 
 		is_dm = message.channel.type == 'private'
+		mentionedMe = False
+		for user in message.mentions:
+			if user.id == self.user.id:
+				mentionedMe = True
+				break
 
 		cmdmsg = message.content.lower()
 		if 'twist' in cmdmsg:
+			mentionedMe = True
 			if 'thinking' in cmdmsg and 'about' in cmdmsg:
 				subs = 'nothing' if len(self.subject) == 0 else ', '.join(self.subject)
 				await message.channel.send("I'm thinking about `{0}`.".format(subs))
@@ -116,7 +122,7 @@ class TwistBot(discord.Client):
 			self.words[w] += 1
 
 		shouldSendMessage = random.randint(0, 100) <= 15 and not self.justSent
-		if len(self.subject) > 0 and shouldSendMessage:
+		if (len(self.subject) > 0 and shouldSendMessage) or (len(self.subject) > 0 and mentionedMe):
 			self.justSent = True
 			subs = self.subject
 

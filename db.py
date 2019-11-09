@@ -243,6 +243,7 @@ FROM tb_trigger t
 	INNER JOIN tb_sentence s ON s.id == t.response
 WHERE w.data IN ({0}) {1}
  AND cast((julianday('now') - s.date_time) * 24 as INTEGER) >= 1
+ ORDER BY RANDOM() LIMIT 1
 		""".format(opts, (" AND " + ngtest if len(ngrams) > 0 else ""))
 
 		print(sql)
@@ -254,4 +255,4 @@ WHERE w.data IN ({0}) {1}
 		for r in recs:
 			rets.append(r[0])
 		cursor.close()
-		return list(map(lambda x: x.replace("`", "'"), rets))
+		return list(map(lambda x: x.replace("`", "'"), rets))[0] if len(rets) > 0 else None

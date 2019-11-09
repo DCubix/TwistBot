@@ -161,12 +161,9 @@ class TwistBot(discord.Client):
 
 		shouldSendMessage = random.randint(0, 100) <= 15 and not self.justSent
 		if (len(subs) > 0 and shouldSendMessage) or (len(subs) > 0 and mentionedMe):
-			self.justSent = True
-
-			lst = DB.getResponse(subs, ngrams=ngrams)
-			if len(lst) > 0:
-				msg = random.choice(lst)
-
+			msg = DB.getResponse(subs, ngrams=ngrams)
+			if msg is not None:
+				self.justSent = True
 				if self.lastMention is None:
 					randName = DB.randomName() if len(self.peopleInConvo) == 0 else random.choice(self.peopleInConvo)
 					randName = randName if len(self.peopleInConvo) == 0 else DB.getDisplayName(randName)

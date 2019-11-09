@@ -4,31 +4,39 @@ from db import DB
 
 STOP_WORDS = ['ourselves', 'hers', 'between', 'yourself', 'but', 'again', 'there', 'about', 'once', 'during', 'out', 'very', 'having', 'with', 'they', 'own', 'an', 'be', 'some', 'for', 'do', 'its', 'yours', 'such', 'into', 'of', 'most', 'itself', 'other', 'off', 'is', 's', 'am', 'or', 'who', 'as', 'from', 'him', 'each', 'the', 'themselves', 'until', 'below', 'are', 'we', 'these', 'your', 'his', 'through', 'don', 'nor', 'me', 'were', 'her', 'more', 'himself', 'this', 'down', 'should', 'our', 'their', 'while', 'above', 'both', 'up', 'to', 'ours', 'had', 'she', 'all', 'no', 'when', 'at', 'any', 'before', 'them', 'same', 'and', 'been', 'have', 'in', 'will', 'on', 'does', 'yourselves', 'then', 'that', 'because', 'what', 'over', 'why', 'so', 'can', 'did', 'not', 'now', 'under', 'he', 'you', 'herself', 'has', 'just', 'where', 'too', 'only', 'myself', 'which', 'those', 'i', 'after', 'few', 'whom', 't', 'being', 'if', 'theirs', 'my', 'against', 'a', 'by', 'doing', 'it', 'how', 'further', 'was', 'here', 'than']
 
-class DecayThread:
-	async def run(self, bot):
-		while True:
-			await asyncio.sleep(10)
 
-			todel = []
-			for k in bot.words.keys():
-				bot.words[k] -= 0.1
-				if bot.words[k] <= 0:
-					todel.append(k)
-			for w in todel:
-				del bot.words[w]
+async def messageAllowanceTime(bot):
+	while True:
+		bot.canSendMessage = False
+		await asyncio.sleep(15)
+		bot.canSendMessage = True
+		await asyncio.sleep(15)
 
-			# set subject
-			sortedWords = collections.OrderedDict(sorted(bot.words.items(), key=lambda kv: kv[1], reverse=True))
-			count = len(sortedWords.items())
-			if count > 0:
-				ctx = list(sortedWords.items())[:(count if count < bot.maxWords else bot.maxWords)]
-				print("CONTEXT: " + str(ctx))
+async def decayTask(bot):
+	while True:
+		await asyncio.sleep(10)
 
-				bot.subject = [k for k, _ in ctx]
-				await bot.changeStatus('{0}'.format(bot.subject[0]))
-			else:
-				bot.subject = []
-				await bot.changeStatus('nothing')
+		todel = []
+		for k in bot.words.keys():
+			bot.words[k] -= 0.1
+			if bot.words[k] <= 0:
+				todel.append(k)
+		for w in todel:
+			del bot.words[w]
+
+		# set subject
+		sortedWords = collections.OrderedDict(sorted(bot.words.items(), key=lambda kv: kv[1], reverse=True))
+		count = len(sortedWords.items())
+		if count > 0:
+			ctx = list(sortedWords.items())[:(count if count < bot.maxWords else bot.maxWords)]
+			print("CONTEXT: " + str(ctx))
+
+			bot.subject = [k for k, _ in ctx]
+			await bot.changeStatus('{0}'.format(bot.subject[0]))
+		else:
+			bot.subject = []
+			print("CONTEXT: Empty")
+			await bot.changeStatus('nothing')
 
 class TwistBot(discord.Client):
 	async def changeStatus(self, status):
@@ -44,8 +52,10 @@ class TwistBot(discord.Client):
 		self.messageCount = 0
 		self.maxWords = 4
 		self.learn = False
+		self.canSendMessage = False
 
-		asyncio.create_task(DecayThread().run(self))
+		asyncio.create_task(decayTask(self))
+		asyncio.create_task(messageAllowanceTime(self))
 
 		self.previousWords = []
 		self.subject = []
@@ -105,7 +115,7 @@ class TwistBot(discord.Client):
 			if w not in self.words.keys(): self.words[w] = 0
 			self.words[w] += 1
 
-		shouldSendMessage = random.randint(0, 1000) < 400
+		shouldSendMessage = random.randint(0, 1000) <= 15 and self.canSendMessage
 		if len(self.subject) > 0 and shouldSendMessage:
 			subs = self.subject
 

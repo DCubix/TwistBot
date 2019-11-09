@@ -184,7 +184,7 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 		if wid is None: wid = DB.saveWord(word)
 		if sid is None: sid = DB.saveSentence(sentence)
 
-		sql = "INSERT INTO tb_trigger('trigger', 'response') VALUES({0}, {1})".format(wid, sid)
+		sql = "INSERT INTO tb_trigger('trigger', 'response', 'date_time') VALUES({0}, {1}, julianday('now'))".format(wid, sid)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		DB.conn.commit()

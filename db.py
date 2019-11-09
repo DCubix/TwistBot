@@ -92,6 +92,21 @@ class DB:
 		return rets[0] if len(rets) > 0 else random.choice(['buddy', 'bruh', 'dude', 'lad'])
 
 	@staticmethod
+	def getDisplayName(name):
+		uid = DB.userID(name)
+		if uid is None:
+			return random.choice(['buddy', 'bruh', 'dude', 'lad'])
+		sql = "SELECT display_name FROM tb_user WHERE name = '{0}'".format(name)
+		cursor = DB.connection().cursor()
+		cursor.execute(sql)
+		recs = cursor.fetchall()
+		rets = []
+		for r in recs:
+			rets.append(r[0])
+		cursor.close()
+		return rets[0] if len(rets) > 0 else random.choice(['buddy', 'bruh', 'dude', 'lad'])
+
+	@staticmethod
 	def saveUser(name, displayName):
 		uid = DB.userID(name)
 		cursor = DB.connection().cursor()
@@ -216,7 +231,9 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 		return list(map(lambda x: x.replace("`", "'"), rets))
 
 	@staticmethod
-	def getResponse(triggers):
+	def getResponse(triggers, ngrams=[]):
+		ngtest = " OR ".join(list(map(lambda x: "s.data LIKE '%{0}%'".format(x.replace("'", "`")), ngrams)))
+
 		opts = ", ".join(list(map(lambda x: "'{0}'".format(x.replace("'", "`")), triggers)))
 		sql = """
 SELECT DISTINCT
@@ -224,9 +241,12 @@ SELECT DISTINCT
 FROM tb_trigger t
 	INNER JOIN tb_word w ON w.id == t.trigger
 	INNER JOIN tb_sentence s ON s.id == t.response
-WHERE w.data in ({0}) OR s.data LIKE '%{1}%'
+WHERE w.data IN ({0}) {1}
  AND cast((julianday('now') - s.date_time) * 24 as INTEGER) >= 1
-		""".format(opts, triggers[0].replace("'", "`"))
+		""".format(opts, (" AND " + ngtest if len(ngrams) > 0 else ""))
+
+		print(sql)
+
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		recs = cursor.fetchall()

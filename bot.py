@@ -5,6 +5,11 @@ from db import DB
 STOP_WORDS = ['ourselves', 'hers', 'between', 'yourself', 'but', 'again', 'there', 'about', 'once', 'during', 'out', 'very', 'having', 'with', 'they', 'own', 'an', 'be', 'some', 'for', 'do', 'its', 'yours', 'such', 'into', 'of', 'most', 'itself', 'other', 'off', 'is', 's', 'am', 'or', 'who', 'as', 'from', 'him', 'each', 'the', 'themselves', 'until', 'below', 'are', 'we', 'these', 'your', 'his', 'through', 'don', 'nor', 'me', 'were', 'her', 'more', 'himself', 'this', 'down', 'should', 'our', 'their', 'while', 'above', 'both', 'up', 'to', 'ours', 'had', 'she', 'all', 'no', 'when', 'at', 'any', 'before', 'them', 'same', 'and', 'been', 'have', 'in', 'will', 'on', 'does', 'yourselves', 'then', 'that', 'because', 'what', 'over', 'why', 'so', 'can', 'did', 'not', 'now', 'under', 'he', 'you', 'herself', 'has', 'just', 'where', 'too', 'only', 'myself', 'which', 'those', 'i', 'after', 'few', 'whom', 't', 'being', 'if', 'theirs', 'my', 'against', 'a', 'by', 'doing', 'it', 'how', 'further', 'was', 'here', 'than']
 
 
+async def removeUsersTask(bot):
+	while True:
+		await asyncio.sleep(60)
+		bot.peopleInConvo = []
+
 async def messageAllowanceTime(bot):
 	while True:
 		await asyncio.sleep(1)
@@ -39,6 +44,16 @@ async def decayTask(bot):
 			await bot.changeStatus('nothing')
 
 class TwistBot(discord.Client):
+	def makeNGrams(self, words, size=2):
+		if size < 2: return words
+		ret = []
+		for i in range(len(words)-(size - 1)):
+			ngram = []
+			for j in range(size):
+				ngram.append(words[i + j])
+			ret.append(tuple(ngram))
+		return ret
+
 	async def changeStatus(self, status):
 		activity = discord.Activity(name=status, type=discord.ActivityType.watching)
 		await self.change_presence(activity=activity)
@@ -53,9 +68,12 @@ class TwistBot(discord.Client):
 		self.maxWords = 4
 		self.learn = False
 		self.justSent = False
+		self.lastMention = None
+		self.peopleInConvo = []
 
 		asyncio.create_task(decayTask(self))
 		asyncio.create_task(messageAllowanceTime(self))
+		asyncio.create_task(removeUsersTask(self))
 
 		self.previousWords = []
 		self.subject = []
@@ -70,14 +88,20 @@ class TwistBot(discord.Client):
 		DB.saveUser(message.author.name, message.author.display_name)
 
 		is_dm = message.channel.type == 'private'
+
 		mentionedMe = False
 		for user in message.mentions:
 			if user.id == self.user.id:
+				self.lastMention = message.author.name
 				mentionedMe = True
 				break
 
+		if message.author.name not in self.peopleInConvo:
+			self.peopleInConvo.append(message.author.name)
+
 		cmdmsg = message.content.lower()
 		if 'twist' in cmdmsg:
+			self.lastMention = message.author.name
 			mentionedMe = True
 			if 'thinking' in cmdmsg and 'about' in cmdmsg:
 				subs = 'nothing' if len(self.subject) == 0 else ', '.join(self.subject)
@@ -91,6 +115,9 @@ class TwistBot(discord.Client):
 		def _cleanup(x):
 			return re.sub(r'[^\w\d\'"]+|_', '', x)
 
+		def _cleanupPunctuation(x):
+			return re.sub(r'[\.,\?!:]', '', x)
+
 		msg = discord.utils.escape_mentions(message.content)
 
 		# Cleanup
@@ -103,8 +130,16 @@ class TwistBot(discord.Client):
 		# Tokenize
 		words = msg.lower().split()
 
+		# Remove <name>
+		words = list(filter(lambda x: x != '<name>', words))
+
+		# Make n-grams
+		ngrams = [' '.join(n) for n in self.makeNGrams(words)]
+		ngrams = list(map(_cleanupPunctuation, ngrams))
+		print('NGRAMS: ' + str(ngrams))
+
 		# Remove stop words
-		words = list(filter(lambda x: x != '<name>' and x not in STOP_WORDS, words))
+		words = list(filter(lambda x: x not in STOP_WORDS, words))
 
 		# Clean punctuation
 		words = list(map(_cleanup, words))
@@ -113,25 +148,32 @@ class TwistBot(discord.Client):
 		words = list(filter(lambda x: len(x.strip()) > 0, words))
 		excludes = DB.getExcludes()
 
-		for w in words:
-			if w in excludes: continue
+		# Filter exclusion list
+		words = list(filter(lambda x: x not in excludes, words))
 
+		for w in words:
 			DB.saveTrigger(w, msg)
 
 			if w not in self.words.keys(): self.words[w] = 0
 			self.words[w] += 1
 
-		shouldSendMessage = random.randint(0, 100) <= 15 and not self.justSent
-		if (len(self.subject) > 0 and shouldSendMessage) or (len(self.subject) > 0 and mentionedMe):
-			self.justSent = True
-			subs = self.subject
+		subs = self.subject + words
 
-			lst = DB.getResponse(subs)
+		shouldSendMessage = random.randint(0, 100) <= 15 and not self.justSent
+		if (len(subs) > 0 and shouldSendMessage) or (len(subs) > 0 and mentionedMe):
+			self.justSent = True
+
+			lst = DB.getResponse(subs, ngrams=ngrams)
 			if len(lst) > 0:
 				msg = random.choice(lst)
-				randName = DB.randomName().split()[0]
+
+				if self.lastMention is None:
+					randName = DB.randomName() if len(self.peopleInConvo) == 0 else random.choice(self.peopleInConvo)
+					randName = randName if len(self.peopleInConvo) == 0 else DB.getDisplayName(randName)
+					randName = randName.split()[0]
+				else:
+					randName = DB.getDisplayName(self.lastMention)
 				msg = re.sub(re.compile(r'twistbot', re.IGNORECASE), randName, msg)
-				randName = DB.randomName().split()[0]
 				msg = re.sub(re.compile(r'<name>', re.IGNORECASE), randName, msg)
 
 				typingTimeSecs = len(msg) * 0.1
@@ -142,6 +184,7 @@ class TwistBot(discord.Client):
 					await message.channel.send(msg)
 				else:
 					await message.author.send(msg)
+				self.lastMention = None
 
 client = TwistBot()
 tok = ''

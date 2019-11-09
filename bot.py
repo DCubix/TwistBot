@@ -7,10 +7,10 @@ STOP_WORDS = ['ourselves', 'hers', 'between', 'yourself', 'but', 'again', 'there
 
 async def messageAllowanceTime(bot):
 	while True:
-		bot.canSendMessage = False
-		await asyncio.sleep(15)
-		bot.canSendMessage = True
-		await asyncio.sleep(15)
+		await asyncio.sleep(1)
+		if bot.justSent:
+			await asyncio.sleep(30)
+			bot.justSent = False
 
 async def decayTask(bot):
 	while True:
@@ -52,7 +52,7 @@ class TwistBot(discord.Client):
 		self.messageCount = 0
 		self.maxWords = 4
 		self.learn = False
-		self.canSendMessage = False
+		self.justSent = False
 
 		asyncio.create_task(decayTask(self))
 		asyncio.create_task(messageAllowanceTime(self))
@@ -83,7 +83,7 @@ class TwistBot(discord.Client):
 				return
 
 		def _cleanup(x):
-			return re.sub(r'[^\w\d\'"]+', '', x)
+			return re.sub(r'[^\w\d\'"]+|_', '', x)
 
 		msg = discord.utils.escape_mentions(message.content)
 
@@ -115,8 +115,9 @@ class TwistBot(discord.Client):
 			if w not in self.words.keys(): self.words[w] = 0
 			self.words[w] += 1
 
-		shouldSendMessage = random.randint(0, 1000) <= 15 and self.canSendMessage
+		shouldSendMessage = random.randint(0, 100) <= 15 and not self.justSent
 		if len(self.subject) > 0 and shouldSendMessage:
+			self.justSent = True
 			subs = self.subject
 
 			lst = DB.getResponse(subs)

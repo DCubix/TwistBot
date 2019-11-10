@@ -231,21 +231,33 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 		return list(map(lambda x: x.replace("`", "'"), rets))
 
 	@staticmethod
-	def getResponse(triggers, ngrams=[]):
-		ngtest = " OR ".join(list(map(lambda x: "s.data LIKE '%{0}%'".format(x.replace("'", "`")), ngrams)))
+	def getResponse(data, mode='NORMAL'): 
+		# BASIC = Use n-grams on the words table only
+		# NORMAL = Use n-grams on sentences only
+		# ADVANCED = Use n-grams on both word and sentence tables
 
-		opts = ", ".join(list(map(lambda x: "'{0}'".format(x.replace("'", "`")), triggers)))
+		if len(data) == 0: return None
+
 		sql = """
 SELECT DISTINCT
 	s.data AS response
 FROM tb_trigger t
 	INNER JOIN tb_word w ON w.id == t.trigger
 	INNER JOIN tb_sentence s ON s.id == t.response
-WHERE w.data IN ({0}) {1}
- AND cast((julianday('now') - s.date_time) * 24 as INTEGER) >= 1
- ORDER BY RANDOM() LIMIT 1
-		""".format(opts, (" AND " + ngtest if len(ngrams) > 0 else ""))
+WHERE cast((julianday('now') - s.date_time) * 24 as INTEGER) >= 1 AND (
+		"""
 
+		if mode == "BASIC":
+			ngtest = " OR ".join(list(map(lambda x: "w.data LIKE '%{0}%'".format(x.replace("'", "`")), data)))
+			sql += ngtest
+		elif mode == "NORMAL":
+			ngtest = " OR ".join(list(map(lambda x: "s.data LIKE '%{0}%'".format(x.replace("'", "`")), data)))
+			sql += ngtest
+		elif mode == "ADVANCED":
+			ngtest = " OR ".join(list(map(lambda x: "(w.data = '{0}' AND s.data LIKE '%{0}%')\n".format(x.replace("'", "`")), data)))
+			sql += ngtest
+
+		sql += "\n) ORDER BY RANDOM() LIMIT 1"
 		print(sql)
 
 		cursor = DB.connection().cursor()

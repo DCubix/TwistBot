@@ -1,6 +1,7 @@
 import discord, collections, random, re, asyncio, time
 from threading import Thread
 from db import DB
+import commands
 
 STOP_WORDS = ['ourselves', 'hers', 'between', 'yourself', 'but', 'again', 'there', 'about', 'once', 'during', 'out', 'very', 'having', 'with', 'they', 'own', 'an', 'be', 'some', 'for', 'do', 'its', 'yours', 'such', 'into', 'of', 'most', 'itself', 'other', 'off', 'is', 's', 'am', 'or', 'who', 'as', 'from', 'him', 'each', 'the', 'themselves', 'until', 'below', 'are', 'we', 'these', 'your', 'his', 'through', 'don', 'nor', 'me', 'were', 'her', 'more', 'himself', 'this', 'down', 'should', 'our', 'their', 'while', 'above', 'both', 'up', 'to', 'ours', 'had', 'she', 'all', 'no', 'when', 'at', 'any', 'before', 'them', 'same', 'and', 'been', 'have', 'in', 'will', 'on', 'does', 'yourselves', 'then', 'that', 'because', 'what', 'over', 'why', 'so', 'can', 'did', 'not', 'now', 'under', 'he', 'you', 'herself', 'has', 'just', 'where', 'too', 'only', 'myself', 'which', 'those', 'i', 'after', 'few', 'whom', 't', 'being', 'if', 'theirs', 'my', 'against', 'a', 'by', 'doing', 'it', 'how', 'further', 'was', 'here', 'than']
 
@@ -45,12 +46,15 @@ async def decayTask(bot):
 
 class TwistBot(discord.Client):
 	def makeNGrams(self, words, size=2):
+		excludes = DB.getExcludes()
 		if size < 2: return words
 		ret = []
 		for i in range(len(words)-(size - 1)):
 			ngram = []
 			for j in range(size):
-				ngram.append(words[i + j])
+				w = words[i + j]
+				if w in excludes: w = random.choice(['bruh', 'doofus', 'muppet'])
+				ngram.append(w)
 			ret.append(tuple(ngram))
 		return ret
 
@@ -63,13 +67,22 @@ class TwistBot(discord.Client):
 		print('Logged in as {0}.'.format(self.user))
 
 		self.words = {}
-		self.maxMessageBeforeMine = 20
-		self.messageCount = 0
 		self.maxWords = 4
-		self.learn = False
 		self.justSent = False
 		self.lastMention = None
 		self.peopleInConvo = []
+
+		self.mode = 'ADVANCED'
+
+		# @TwistBot set_mode NORMAL
+		self.commands = {
+			'set_mode': commands.cmdSetMode,
+			'get_context': commands.cmdThinking,
+			'clear_context': commands.cmdClrContext,
+			'new_context': commands.cmdNewContext,
+			'get_words': commands.cmdRndWords,
+			'list_commands': commands.cmdList,
+		}
 
 		asyncio.create_task(decayTask(self))
 		asyncio.create_task(messageAllowanceTime(self))
@@ -99,24 +112,24 @@ class TwistBot(discord.Client):
 		if message.author.name not in self.peopleInConvo:
 			self.peopleInConvo.append(message.author.name)
 
-		cmdmsg = message.content.lower()
-		if 'twist' in cmdmsg:
+		cmdmsg = re.sub(r'<@.*>', '', message.content).strip()
+		if 'twist' in cmdmsg.lower() or mentionedMe:
 			self.lastMention = message.author.name
 			mentionedMe = True
-			if 'thinking' in cmdmsg and 'about' in cmdmsg:
-				subs = 'nothing' if len(self.subject) == 0 else ', '.join(self.subject)
-				await message.channel.send("I'm thinking about `{0}`.".format(subs))
-				return
-			elif 'word' in cmdmsg and 'random' in cmdmsg:
-				words = ' '.join(DB.randomWords(random.randint(2, 5)))
-				await message.channel.send(words)
+
+			spl = cmdmsg.split()
+			cmd = spl[0].strip()
+			args = spl[1:]
+
+			if cmd in self.commands.keys():
+				await self.commands[cmd](self, message, args)
 				return
 
 		def _cleanup(x):
 			return re.sub(r'[^\w\d\'"]+|_', '', x)
 
 		def _cleanupPunctuation(x):
-			return re.sub(r'[\.,\?!:]', '', x)
+			return re.sub(r'[\.,\?!:]', '', x).replace("'", "`").strip()
 
 		msg = discord.utils.escape_mentions(message.content)
 
@@ -131,12 +144,14 @@ class TwistBot(discord.Client):
 		words = msg.lower().split()
 
 		# Remove <name>
-		words = list(filter(lambda x: x != '<name>', words))
+		words = list(filter(lambda x: x != '<name>' and len(x.strip()) > 0, words))
 
 		# Make n-grams
 		ngrams = [' '.join(n) for n in self.makeNGrams(words)]
 		ngrams = list(map(_cleanupPunctuation, ngrams))
+		ngrams = list(filter(lambda x: len(x.strip()) > 0, ngrams))
 		print('NGRAMS: ' + str(ngrams))
+		##
 
 		# Remove stop words
 		words = list(filter(lambda x: x not in STOP_WORDS, words))
@@ -151,25 +166,30 @@ class TwistBot(discord.Client):
 		# Filter exclusion list
 		words = list(filter(lambda x: x not in excludes, words))
 
-		for w in words:
+		for w in ngrams:
 			DB.saveTrigger(w, msg)
 
 			if w not in self.words.keys(): self.words[w] = 0
 			self.words[w] += 1
 
-		subs = self.subject + words
+		subs = []
+		for ng in ngrams: subs.append(ng)
+		for ng in self.subject:
+			if ng not in subs: subs.append(ng)
 
 		shouldSendMessage = random.randint(0, 100) <= 15 and not self.justSent
 		if (len(subs) > 0 and shouldSendMessage) or (len(subs) > 0 and mentionedMe):
-			msg = DB.getResponse(subs, ngrams=ngrams)
+			msg = DB.getResponse(subs, mode=self.mode)
 			if msg is not None:
 				self.justSent = True
+
 				if self.lastMention is None:
 					randName = DB.randomName() if len(self.peopleInConvo) == 0 else random.choice(self.peopleInConvo)
 					randName = randName if len(self.peopleInConvo) == 0 else DB.getDisplayName(randName)
 					randName = randName.split()[0]
 				else:
 					randName = DB.getDisplayName(self.lastMention)
+
 				msg = re.sub(re.compile(r'twistbot', re.IGNORECASE), randName, msg)
 				msg = re.sub(re.compile(r'<name>', re.IGNORECASE), randName, msg)
 

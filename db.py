@@ -3,7 +3,7 @@ import sqlite3, random
 dbsql = """
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE IF NOT EXISTS tb_word(
+CREATE TABLE IF NOT EXISTS tb_subject(
 	id integer primary key,
 	data text
 );
@@ -14,17 +14,18 @@ CREATE TABLE IF NOT EXISTS tb_user(
 	display_name text
 );
 
-CREATE TABLE IF NOT EXISTS tb_sentence(
+CREATE TABLE IF NOT EXISTS tb_response(
 	id integer primary key,
 	data text,
 	date_time real
 );
 
 CREATE TABLE IF NOT EXISTS tb_trigger(
-	trigger integer,
+	subject integer,
 	response integer,
-	FOREIGN KEY(trigger) REFERENCES tb_word(id),
-	FOREIGN KEY(response) REFERENCES tb_sentence(id)
+	date_time real,
+	FOREIGN KEY(subject) REFERENCES tb_subject(id),
+	FOREIGN KEY(response) REFERENCES tb_response(id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_exclude(
@@ -52,7 +53,7 @@ class DB:
 	@staticmethod
 	def connection():
 		if DB.conn is None:
-			DB.conn = sqlite3.connect('tb_data.db')
+			DB.conn = sqlite3.connect('data.db')
 			cursor = DB.conn.cursor()
 			for sql in dbsql.split(';'):
 				cursor.execute(sql)
@@ -95,7 +96,7 @@ class DB:
 	def getDisplayName(name):
 		uid = DB.userID(name)
 		if uid is None:
-			return random.choice(['buddy', 'bruh', 'dude', 'lad'])
+			return random.choice(['buddy', 'bruh', 'dude', 'lad', 'pal', 'man'])
 		sql = "SELECT display_name FROM tb_user WHERE name = '{0}'".format(name)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
@@ -137,9 +138,9 @@ class DB:
 		return rets
 
 	@staticmethod
-	def wordID(w):
+	def subjectID(w):
 		w = w.replace("'", "`")
-		sql = "SELECT id FROM tb_word WHERE data = '{0}'".format(w)
+		sql = "SELECT id FROM tb_subject WHERE data = '{0}'".format(w)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		recs = cursor.fetchall()
@@ -150,9 +151,9 @@ class DB:
 		return rets[0] if len(rets) > 0 else None
 
 	@staticmethod
-	def sentenceID(s):
+	def responseID(s):
 		s = s.replace("'", "`")
-		sql = "SELECT id FROM tb_sentence WHERE data = '{0}'".format(s)
+		sql = "SELECT id FROM tb_response WHERE data = '{0}'".format(s)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		recs = cursor.fetchall()
@@ -163,13 +164,13 @@ class DB:
 		return rets[0] if len(rets) > 0 else None
 
 	@staticmethod
-	def saveWord(w):
+	def saveSubject(w):
 		cursor = DB.connection().cursor()
 		w = w.replace("'", "`")
 		sql = """
-INSERT INTO tb_word('data')
+INSERT INTO tb_subject('data')
 SELECT '{0}'
-WHERE NOT EXISTS(SELECT 1 FROM tb_word WHERE data = '{0}')
+WHERE NOT EXISTS(SELECT 1 FROM tb_subject WHERE data = '{0}')
 		"""
 		cursor.execute(sql.format(w))
 		DB.conn.commit()
@@ -178,13 +179,13 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_word WHERE data = '{0}')
 		return gid
 
 	@staticmethod
-	def saveSentence(sent):
+	def saveResponse(sent):
 		cursor = DB.connection().cursor()
 		sent = sent.replace("'", "`")
 		sql = """
-INSERT INTO tb_sentence('data', 'date_time')
+INSERT INTO tb_response('data', 'date_time')
 SELECT '{0}', julianday('now')
-WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
+WHERE NOT EXISTS(SELECT 1 FROM tb_response WHERE data = '{0}')
 		"""
 		cursor.execute(sql.format(sent))
 		DB.conn.commit()
@@ -193,13 +194,14 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 		return gid
 
 	@staticmethod
-	def saveTrigger(word, sentence):
-		wid = DB.wordID(word)
-		sid = DB.sentenceID(sentence)
-		if wid is None: wid = DB.saveWord(word)
-		if sid is None: sid = DB.saveSentence(sentence)
+	def saveTrigger(sub, resp):
+		wid = DB.subjectID(sub)
+		sid = DB.responseID(resp)
 
-		sql = "INSERT INTO tb_trigger('trigger', 'response', 'date_time') VALUES({0}, {1}, julianday('now'))".format(wid, sid)
+		if wid is None: wid = DB.saveSubject(sub)
+		if sid is None: sid = DB.saveResponse(resp)
+
+		sql = "INSERT INTO tb_trigger('subject', 'response', 'date_time') VALUES({0}, {1}, julianday('now'))".format(wid, sid)
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)
 		DB.conn.commit()
@@ -209,11 +211,11 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 	def saveTriggers(triggers):
 		cursor = DB.connection().cursor()
 		for word, sentence in triggers:
-			wid = DB.wordID(word)
-			sid = DB.sentenceID(sentence)
-			if wid is None: wid = DB.saveWord(word)
-			if sid is None: sid = DB.saveSentence(sentence)
-			sql = "INSERT INTO tb_trigger('trigger', 'response', 'date_time') VALUES({0}, {1}, julianday('now'))".format(wid, sid)
+			wid = DB.subjectID(word)
+			sid = DB.responseID(sentence)
+			if wid is None: wid = DB.saveSubject(word)
+			if sid is None: sid = DB.saveResponse(sentence)
+			sql = "INSERT INTO tb_trigger('subject', 'response', 'date_time') VALUES({0}, {1}, julianday('now'))".format(wid, sid)
 			cursor.execute(sql)
 		DB.conn.commit()
 		cursor.close()
@@ -231,7 +233,7 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 		return list(map(lambda x: x.replace("`", "'"), rets))
 
 	@staticmethod
-	def getResponse(data, mode='NORMAL'): 
+	def getResponse(data): 
 		# BASIC = Use n-grams on the words table only
 		# NORMAL = Use n-grams on sentences only
 		# ADVANCED = Use n-grams on both word and sentence tables
@@ -242,23 +244,15 @@ WHERE NOT EXISTS(SELECT 1 FROM tb_sentence WHERE data = '{0}')
 SELECT DISTINCT
 	s.data AS response
 FROM tb_trigger t
-	INNER JOIN tb_word w ON w.id == t.trigger
-	INNER JOIN tb_sentence s ON s.id == t.response
-WHERE cast((julianday('now') - s.date_time) * 24 as INTEGER) >= 1 AND (
+	INNER JOIN tb_subject w ON w.id == t.subject
+	INNER JOIN tb_response s ON s.id == t.response
+WHERE (
 		"""
 
-		if mode == "BASIC":
-			ngtest = " OR ".join(list(map(lambda x: "w.data LIKE '%{0}%'".format(x.replace("'", "`")), data)))
-			sql += ngtest
-		elif mode == "NORMAL":
-			ngtest = " OR ".join(list(map(lambda x: "s.data LIKE '%{0}%'".format(x.replace("'", "`")), data)))
-			sql += ngtest
-		elif mode == "ADVANCED":
-			ngtest = " OR ".join(list(map(lambda x: "(w.data = '{0}' AND s.data LIKE '%{0}%')\n".format(x.replace("'", "`")), data)))
-			sql += ngtest
+		ngtest = " OR ".join(list(map(lambda x: "(w.data LIKE '%{0}%')\n".format(x.replace("'", "`")), data)))
+		sql += ngtest
 
 		sql += "\n) ORDER BY RANDOM() LIMIT 1"
-		print(sql)
 
 		cursor = DB.connection().cursor()
 		cursor.execute(sql)

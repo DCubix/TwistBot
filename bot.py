@@ -1,10 +1,12 @@
-import discord, collections, random, re, asyncio, time
+import discord, collections, random, re, asyncio, time, spacy, itertools
+from spacy.lang.en import English
 from threading import Thread
 from db import DB
 import commands
 
-STOP_WORDS = ['ourselves', 'hers', 'between', 'yourself', 'but', 'again', 'there', 'about', 'once', 'during', 'out', 'very', 'having', 'with', 'they', 'own', 'an', 'be', 'some', 'for', 'do', 'its', 'yours', 'such', 'into', 'of', 'most', 'itself', 'other', 'off', 'is', 's', 'am', 'or', 'who', 'as', 'from', 'him', 'each', 'the', 'themselves', 'until', 'below', 'are', 'we', 'these', 'your', 'his', 'through', 'don', 'nor', 'me', 'were', 'her', 'more', 'himself', 'this', 'down', 'should', 'our', 'their', 'while', 'above', 'both', 'up', 'to', 'ours', 'had', 'she', 'all', 'no', 'when', 'at', 'any', 'before', 'them', 'same', 'and', 'been', 'have', 'in', 'will', 'on', 'does', 'yourselves', 'then', 'that', 'because', 'what', 'over', 'why', 'so', 'can', 'did', 'not', 'now', 'under', 'he', 'you', 'herself', 'has', 'just', 'where', 'too', 'only', 'myself', 'which', 'those', 'i', 'after', 'few', 'whom', 't', 'being', 'if', 'theirs', 'my', 'against', 'a', 'by', 'doing', 'it', 'how', 'further', 'was', 'here', 'than']
+nlp = English()
 
+STOP_WORDS = ['ourselves', 'hers', 'between', 'yourself', 'but', 'again', 'there', 'about', 'once', 'during', 'out', 'very', 'having', 'with', 'they', 'own', 'an', 'be', 'some', 'for', 'do', 'its', 'yours', 'such', 'into', 'of', 'most', 'itself', 'other', 'off', 'is', 's', 'am', 'or', 'who', 'as', 'from', 'him', 'each', 'the', 'themselves', 'until', 'below', 'are', 'we', 'these', 'your', 'his', 'through', 'don', 'nor', 'me', 'were', 'her', 'more', 'himself', 'this', 'down', 'should', 'our', 'their', 'while', 'above', 'both', 'up', 'to', 'ours', 'had', 'she', 'all', 'no', 'when', 'at', 'any', 'before', 'them', 'same', 'and', 'been', 'have', 'in', 'will', 'on', 'does', 'yourselves', 'then', 'that', 'because', 'what', 'over', 'why', 'so', 'can', 'did', 'not', 'now', 'under', 'he', 'you', 'herself', 'has', 'just', 'where', 'too', 'only', 'myself', 'which', 'those', 'i', 'after', 'few', 'whom', 't', 'being', 'if', 'theirs', 'my', 'against', 'a', 'by', 'doing', 'it', 'how', 'further', 'was', 'here', 'than']
 
 async def removeUsersTask(bot):
 	while True:
@@ -41,22 +43,9 @@ async def decayTask(bot):
 			await bot.changeStatus('{0}'.format(bot.subject[0]))
 		else:
 			bot.subject = []
-			print("CONTEXT: Empty")
-			await bot.changeStatus('nothing')
+			await bot.changeStatus('the void')
 
 class TwistBot(discord.Client):
-	def makeNGrams(self, words, size=2):
-		excludes = DB.getExcludes()
-		if size < 2: return words
-		ret = []
-		for i in range(len(words)-(size - 1)):
-			ngram = []
-			for j in range(size):
-				w = words[i + j]
-				if w in excludes: w = random.choice(['bruh', 'doofus', 'muppet'])
-				ngram.append(w)
-			ret.append(tuple(ngram))
-		return ret
 
 	async def changeStatus(self, status):
 		activity = discord.Activity(name=status, type=discord.ActivityType.watching)
@@ -72,11 +61,7 @@ class TwistBot(discord.Client):
 		self.lastMention = None
 		self.peopleInConvo = []
 
-		self.mode = 'ADVANCED'
-
-		# @TwistBot set_mode NORMAL
 		self.commands = {
-			'set_mode': commands.cmdSetMode,
 			'get_context': commands.cmdThinking,
 			'clear_context': commands.cmdClrContext,
 			'new_context': commands.cmdNewContext,
@@ -90,7 +75,7 @@ class TwistBot(discord.Client):
 
 		self.previousWords = []
 		self.subject = []
-		await self.changeStatus('nothing')
+		await self.changeStatus('the void')
 
 	async def on_message(self, message):
 		if message.author == self.user:
@@ -98,7 +83,7 @@ class TwistBot(discord.Client):
 
 		if DB.userID(message.author.name) is None:
 			self.subject = ['hello', message.author.name, 'hi', 'hey']
-		DB.saveUser(message.author.name, message.author.display_name)
+			DB.saveUser(message.author.name, message.author.display_name)
 
 		is_dm = message.channel.type == 'private'
 
@@ -140,21 +125,19 @@ class TwistBot(discord.Client):
 		msg = re.sub(re.compile(r'twist.*?(?=\W|$)', re.IGNORECASE), '<name> ', msg).strip() # "Twist"
 		msg = msg.replace("'", "`")
 
-		# Tokenize
-		words = msg.lower().split()
-
 		# Remove <name>
-		words = list(filter(lambda x: x != '<name>' and len(x.strip()) > 0, words))
+		msg = ' '.join(list(filter(lambda x: x.strip() != '<name>' and len(x.strip()) > 0, msg.split(' '))))
 
-		# Make n-grams
-		ngrams = [' '.join(n) for n in self.makeNGrams(words)]
-		ngrams = list(map(_cleanupPunctuation, ngrams))
-		ngrams = list(filter(lambda x: len(x.strip()) > 0, ngrams))
-		print('NGRAMS: ' + str(ngrams))
-		##
+		print(msg.lower(), end=' ')
+
+		# Tokenize
+		lst = nlp(msg.lower())
+		words = [x.orth_ for x in lst]
+
+		print(words)
 
 		# Remove stop words
-		words = list(filter(lambda x: x not in STOP_WORDS, words))
+		words = list(filter(lambda x: x.strip() not in STOP_WORDS, words))
 
 		# Clean punctuation
 		words = list(map(_cleanup, words))
@@ -166,20 +149,20 @@ class TwistBot(discord.Client):
 		# Filter exclusion list
 		words = list(filter(lambda x: x not in excludes, words))
 
-		for w in ngrams:
+		for w in words:
 			DB.saveTrigger(w, msg)
 
 			if w not in self.words.keys(): self.words[w] = 0
 			self.words[w] += 1
 
 		subs = []
-		for ng in ngrams: subs.append(ng)
+		for ng in words: subs.append(ng)
 		for ng in self.subject:
 			if ng not in subs: subs.append(ng)
 
 		shouldSendMessage = random.randint(0, 100) <= 15 and not self.justSent
 		if (len(subs) > 0 and shouldSendMessage) or (len(subs) > 0 and mentionedMe):
-			msg = DB.getResponse(subs, mode=self.mode)
+			msg = DB.getResponse(subs)
 			if msg is not None:
 				self.justSent = True
 

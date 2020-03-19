@@ -60,12 +60,14 @@ class TwistBot(discord.Client):
 		self.justSent = False
 		self.lastMention = None
 		self.peopleInConvo = []
+		self.learning = False
 
 		self.commands = {
 			'get_context': commands.cmdThinking,
 			'clear_context': commands.cmdClrContext,
 			'new_context': commands.cmdNewContext,
 			'get_words': commands.cmdRndWords,
+			'learning_mode': commands.cmdLearningMode,
 			'list_commands': commands.cmdList,
 		}
 
@@ -160,7 +162,7 @@ class TwistBot(discord.Client):
 		for ng in self.subject:
 			if ng not in subs: subs.append(ng)
 
-		shouldSendMessage = random.randint(0, 100) <= 15 and not self.justSent
+		shouldSendMessage = random.randint(0, 100) <= 15 and not self.justSent and not self.learning
 		if (len(subs) > 0 and shouldSendMessage) or (len(subs) > 0 and mentionedMe):
 			msg = DB.getResponse(subs)
 			if msg is not None:

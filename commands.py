@@ -29,4 +29,11 @@ async def cmdNewContext(bot, message, args):
 async def cmdClrContext(bot, message, args):
     bot.subject = []
     bot.words = {}
-    await bot.changeStatus('nothing')
+    await bot.changeStatus('the void')
+
+async def cmdLearningMode(bot, message, args):
+	if len(args) != 1:
+		await message.channel.send('Invalid command. Expected 1 arg.')
+		return
+	val = args[0].lower()
+	bot.learning = val in ['yes', '1', 'on', 'true']

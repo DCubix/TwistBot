@@ -128,12 +128,12 @@ class TwistBot(discord.Client):
 		msg = msg.replace("'", "`")
 
 		# Remove <name>
-		msg = ' '.join(list(filter(lambda x: x.strip() != '<name>' and len(x.strip()) > 0, msg.split(' '))))
+		msg_noname = ' '.join(list(filter(lambda x: x.strip() != '<name>' and len(x.strip()) > 0, msg.split(' '))))
 
 		print(msg.lower(), end=' ')
 
 		# Tokenize
-		lst = nlp(msg.lower())
+		lst = nlp(msg_noname.lower())
 		words = [x.orth_ for x in lst]
 
 		print(words)
@@ -151,9 +151,10 @@ class TwistBot(discord.Client):
 		# Filter exclusion list
 		words = list(filter(lambda x: x not in excludes, words))
 
-		for w in words:
+		for w in self.words.keys():
 			DB.saveTrigger(w, msg)
 
+		for w in words:
 			if w not in self.words.keys(): self.words[w] = 0
 			self.words[w] += 1
 
